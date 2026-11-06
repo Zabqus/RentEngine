@@ -17,6 +17,12 @@ spring:
   flyway:
     enabled: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 app:
   jwt:
     secret: ${JWT_SECRET}

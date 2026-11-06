@@ -9,3 +9,6 @@
 # System
 .DS_Store
 Thumbs.db
+
+# Uploady (zdjęcia uszkodzeń)
+uploads/
