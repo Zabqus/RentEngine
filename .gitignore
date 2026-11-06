@@ -1,0 +1,11 @@
+# IDE
+.idea/
+*.iml
+
+# Sekrety
+.env
+*.env
+
+# System
+.DS_Store
+Thumbs.db
