@@ -1,6 +1,7 @@
 package com.wzabek.rentengine.rental.entity;
 
 import com.wzabek.rentengine.catalog.entity.EquipmentUnit;
+import com.wzabek.rentengine.common.exception.BusinessRuleException;
 import com.wzabek.rentengine.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -38,8 +39,10 @@ public class RentalAgreement {
     @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
+    // Bez settera: status zmieniamy tylko przez changeStatus(), żeby pilnować R8
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Setter(AccessLevel.NONE)
     private AgreementStatus status = AgreementStatus.RESERVED;
 
     @Column(name = "base_price", nullable = false, precision = 10, scale = 2)
@@ -64,5 +67,13 @@ public class RentalAgreement {
         this.endDate = endDate;
         this.basePrice = basePrice;
         this.deposit = deposit;
+    }
+
+    public void changeStatus(AgreementStatus target) {
+        if (!status.canTransitionTo(target)) {
+            throw new BusinessRuleException("INVALID_STATUS_TRANSITION",
+                    "Cannot change agreement status from %s to %s".formatted(status, target));
+        }
+        status = target;
     }
 }
