@@ -16,6 +16,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  # API zawsze po angielsku, niezależnie od Accept-Language i języka systemu
+  web:
+    locale: en
+    locale-resolver: fixed
 
 management:
   endpoints:

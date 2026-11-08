@@ -1,0 +1,170 @@
+### Lista kategorii
+GET {{host}}/api/categories
+
+### Szczegóły kategorii
+GET {{host}}/api/categories/1
+
+### Nieistniejąca kategoria → 404
+GET {{host}}/api/categories/999
+
+### Nowa kategoria → 201 + Location
+POST {{host}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "Przyczepy",
+  "type": "CONSTRUCTION",
+  "requiredParams": ["loadKg", "axles"]
+}
+
+> {% client.global.set("categoryId", response.body.id); %}
+
+### Edycja utworzonej kategorii
+PUT {{host}}/api/categories/{{categoryId}}
+Content-Type: application/json
+
+{
+  "name": "Przyczepy budowlane",
+  "type": "CONSTRUCTION",
+  "requiredParams": ["loadKg", "axles", "brakes"]
+}
+
+### Duplikat nazwy → 409 CATEGORY_NAME_TAKEN
+POST {{host}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "minikoparki",
+  "type": "EXCAVATOR",
+  "requiredParams": []
+}
+
+### Błędy walidacji → 400 z polem errors
+POST {{host}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "",
+  "requiredParams": [""]
+}
+
+### Nowy wymagany parametr, którego nie ma istniejący sprzęt → 409 CATEGORY_PARAMS_CONFLICT
+PUT {{host}}/api/categories/1
+Content-Type: application/json
+
+{
+  "name": "Samochody osobowe",
+  "type": "CAR",
+  "requiredParams": ["powerHp", "gearbox", "seats", "color"]
+}
+
+### Usunięcie kategorii ze sprzętem → 409 CATEGORY_IN_USE
+DELETE {{host}}/api/categories/1
+
+### Usunięcie utworzonej kategorii → 204
+DELETE {{host}}/api/categories/{{categoryId}}
+
+# ======================== SPRZĘT ========================
+
+### Lista sprzętu
+GET {{host}}/api/equipment
+
+### Szczegóły sprzętu
+GET {{host}}/api/equipment/3
+
+### Nowy sprzęt → 201 (dodatkowy parametr "cabin" jest dozwolony)
+POST {{host}}/api/equipment
+Content-Type: application/json
+
+{
+  "name": "Takeuchi TB216",
+  "categoryId": 2,
+  "dailyPrice": 480,
+  "deposit": 3500,
+  "tankCapacity": 22,
+  "params": {"weightKg": 1800, "digDepthM": 2.5, "powerKw": 11.8, "cabin": true}
+}
+
+> {% client.global.set("equipmentId", response.body.id); %}
+
+### Brak parametrów wymaganych przez kategorię → 400 z polami params.*
+POST {{host}}/api/equipment
+Content-Type: application/json
+
+{
+  "name": "Takeuchi TB216",
+  "categoryId": 2,
+  "dailyPrice": 480,
+  "deposit": 3500,
+  "params": {"weightKg": 1800}
+}
+
+### Edycja sprzętu
+PUT {{host}}/api/equipment/{{equipmentId}}
+Content-Type: application/json
+
+{
+  "name": "Takeuchi TB216 (kabina)",
+  "categoryId": 2,
+  "dailyPrice": 499.99,
+  "deposit": 3500,
+  "tankCapacity": 22,
+  "params": {"weightKg": 1850, "digDepthM": 2.5, "powerKw": 11.8, "cabin": true}
+}
+
+# ======================== EGZEMPLARZE ========================
+
+### Wszystkie egzemplarze
+GET {{host}}/api/units
+
+### Egzemplarze danego sprzętu
+GET {{host}}/api/units?equipmentId=3
+
+### Nowy egzemplarz → 201 (numer jest zapisywany wielkimi literami)
+POST {{host}}/api/units
+Content-Type: application/json
+
+{
+  "equipmentId": {{equipmentId}},
+  "serialOrPlate": "tak-tb216-0001",
+  "mileageOrHours": 120
+}
+
+> {% client.global.set("unitId", response.body.id); %}
+
+### Duplikat numeru → 409 UNIT_SERIAL_TAKEN
+POST {{host}}/api/units
+Content-Type: application/json
+
+{
+  "equipmentId": {{equipmentId}},
+  "serialOrPlate": "TAK-TB216-0001",
+  "mileageOrHours": 0
+}
+
+### Edycja egzemplarza
+PUT {{host}}/api/units/{{unitId}}
+Content-Type: application/json
+
+{
+  "equipmentId": {{equipmentId}},
+  "serialOrPlate": "TAK-TB216-0001",
+  "mileageOrHours": 135
+}
+
+### Zmiana statusu (serwis ↔ dostępny)
+PATCH {{host}}/api/units/{{unitId}}/status
+Content-Type: application/json
+
+{
+  "status": "IN_SERVICE"
+}
+
+### Usunięcie sprzętu z egzemplarzami → 409 EQUIPMENT_HAS_UNITS
+DELETE {{host}}/api/equipment/{{equipmentId}}
+
+### Usunięcie egzemplarza → 204
+DELETE {{host}}/api/units/{{unitId}}
+
+### Usunięcie sprzętu → 204
+DELETE {{host}}/api/equipment/{{equipmentId}}

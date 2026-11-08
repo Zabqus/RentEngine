@@ -62,6 +62,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Data conflict", "Operation violates data constraints");
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    ProblemDetail handleInvalidRequest(InvalidRequestException ex) {
+        return validationProblem(ex.getErrors());
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
         Map<String, String> errors = new LinkedHashMap<>();

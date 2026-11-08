@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface RentalAgreementRepository extends JpaRepository<RentalAgreement, Long>, JpaSpecificationExecutor<RentalAgreement> {
+
+    boolean existsByUnitId(Long unitId);
 }
