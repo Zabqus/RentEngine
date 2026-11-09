@@ -8,6 +8,7 @@ import com.wzabek.rentengine.catalog.mapper.UnitMapper;
 import com.wzabek.rentengine.catalog.repository.EquipmentUnitRepository;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
+import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -67,6 +68,12 @@ public class UnitService {
     @Transactional
     public UnitResponse changeStatus(Long id, UnitStatus status) {
         EquipmentUnit unit = getUnit(id);
+        // Sprzęt u klienta nie może trafić do serwisu; po zwrocie zrobi to protokół (R7) albo admin
+        if (status == UnitStatus.IN_SERVICE
+                && agreementRepository.existsByUnitIdAndStatusIn(id, List.of(AgreementStatus.ACTIVE, AgreementStatus.OVERDUE))) {
+            throw new BusinessRuleException("UNIT_RENTED_OUT",
+                    "Unit '%s' is currently rented out".formatted(unit.getSerialOrPlate()));
+        }
         unit.setStatus(status);
         return mapper.toResponse(unit);
     }

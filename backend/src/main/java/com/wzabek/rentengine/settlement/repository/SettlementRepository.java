@@ -8,4 +8,7 @@ import java.util.Optional;
 public interface SettlementRepository extends JpaRepository<Settlement, Long> {
 
     Optional<Settlement> findByAgreementId(Long agreementId);
+
+    // R6
+    boolean existsByAgreementClientIdAndPaidFalse(Long clientId);
 }
