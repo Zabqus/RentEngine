@@ -30,3 +30,4 @@ management:
 app:
   jwt:
     secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION:PT24H}
