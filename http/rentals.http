@@ -1,0 +1,103 @@
+# Uwaga: clientId w body jest TYMCZASOWY. W Dniu 5 klient będzie brany z tokena JWT.
+# Klienci z seeda: 1 = Jan Kowalski, 2 = Anna Nowak. Egzemplarz 5 (KUB-U17-0002) jest w serwisie.
+
+### Rezerwacja → 201 (49 h = 3 doby × 450 zł = 1350 zł)
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 1,
+  "unitId": 4,
+  "startDate": "2027-01-10T10:00",
+  "endDate": "2027-01-12T11:00"
+}
+
+> {% client.global.set("rentalId", response.body.id); %}
+
+### Szczegóły umowy
+GET {{host}}/api/rentals/{{rentalId}}
+
+### R1: nakładający się termin → 409 UNIT_NOT_AVAILABLE
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 2,
+  "unitId": 4,
+  "startDate": "2027-01-12T09:00",
+  "endDate": "2027-01-14T10:00"
+}
+
+### Rezerwacja zaczynająca się dokładnie o końcu poprzedniej → 201
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 2,
+  "unitId": 4,
+  "startDate": "2027-01-12T11:00",
+  "endDate": "2027-01-13T11:00"
+}
+
+> {% client.global.set("rentalId2", response.body.id); %}
+
+### R2: egzemplarz w serwisie → 409 UNIT_IN_SERVICE
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 1,
+  "unitId": 5,
+  "startDate": "2027-01-10T10:00",
+  "endDate": "2027-01-11T10:00"
+}
+
+### Błędne daty → 400 (koniec przed początkiem)
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 1,
+  "unitId": 4,
+  "startDate": "2027-02-10T10:00",
+  "endDate": "2027-02-09T10:00"
+}
+
+### Start w przeszłości → 400
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 1,
+  "unitId": 4,
+  "startDate": "2020-01-01T10:00",
+  "endDate": "2020-01-02T10:00"
+}
+
+### Nieistniejąca umowa → 404
+GET {{host}}/api/rentals/999999
+
+### Anulowanie rezerwacji → 200, status CANCELLED
+PATCH {{host}}/api/rentals/{{rentalId}}/cancel
+
+### R8: ponowne anulowanie → 409 INVALID_STATUS_TRANSITION
+PATCH {{host}}/api/rentals/{{rentalId}}/cancel
+
+### Po anulowaniu termin jest znów wolny → 201
+POST {{host}}/api/rentals
+Content-Type: application/json
+
+{
+  "clientId": 2,
+  "unitId": 4,
+  "startDate": "2027-01-10T10:00",
+  "endDate": "2027-01-11T10:00"
+}
+
+> {% client.global.set("rentalId3", response.body.id); %}
+
+### Sprzątanie, żeby plik dało się puścić ponownie
+PATCH {{host}}/api/rentals/{{rentalId2}}/cancel
+
+###
+PATCH {{host}}/api/rentals/{{rentalId3}}/cancel

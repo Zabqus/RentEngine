@@ -133,6 +133,33 @@ class RentalServiceTest {
                 .isInstanceOf(NotFoundException.class);
     }
 
+    @Test
+    void reservedAgreementCanBeCancelled() {
+        RentalAgreement agreement = agreement();
+        when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement));
+
+        RentalResponse response = service.cancel(10L);
+
+        assertThat(response.status()).isEqualTo(AgreementStatus.CANCELLED);
+    }
+
+    @Test
+    void activeAgreementCannotBeCancelled() {
+        RentalAgreement agreement = agreement();
+        agreement.changeStatus(AgreementStatus.ACTIVE);
+        when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement));
+
+        assertThatThrownBy(() -> service.cancel(10L))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("INVALID_STATUS_TRANSITION");
+        assertThat(agreement.getStatus()).isEqualTo(AgreementStatus.ACTIVE);
+    }
+
+    private RentalAgreement agreement() {
+        return new RentalAgreement(client, unit, START, START.plusDays(2),
+                new BigDecimal("900.00"), new BigDecimal("3000.00"));
+    }
+
     private void givenClientAndUnit() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(client));
         when(unitRepository.findByIdForReservation(2L)).thenReturn(Optional.of(unit));

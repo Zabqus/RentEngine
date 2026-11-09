@@ -9,6 +9,7 @@ import com.wzabek.rentengine.common.exception.InvalidRequestException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
 import com.wzabek.rentengine.rental.dto.RentalRequest;
 import com.wzabek.rentengine.rental.dto.RentalResponse;
+import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
 import com.wzabek.rentengine.rental.mapper.RentalMapper;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
@@ -71,6 +72,14 @@ public class RentalService {
         RentalAgreement agreement = new RentalAgreement(client, unit, request.startDate(), request.endDate(),
                 basePrice, equipment.getDeposit());
         return mapper.toResponse(agreementRepository.save(agreement));
+    }
+
+    // R8 pilnuje, że anulować można tylko RESERVED. Sprawdzenie właściciela dojdzie w Dniu 5.
+    @Transactional
+    public RentalResponse cancel(Long id) {
+        RentalAgreement agreement = getAgreement(id);
+        agreement.changeStatus(AgreementStatus.CANCELLED);
+        return mapper.toResponse(agreement);
     }
 
     public RentalAgreement getAgreement(Long id) {

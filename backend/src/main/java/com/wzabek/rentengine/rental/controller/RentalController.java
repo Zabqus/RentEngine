@@ -32,4 +32,9 @@ public class RentalController {
     public RentalResponse findById(@PathVariable Long id) {
         return rentalService.findById(id);
     }
+
+    @PatchMapping("/{id}/cancel")
+    public RentalResponse cancel(@PathVariable Long id) {
+        return rentalService.cancel(id);
+    }
 }
