@@ -1,7 +1,7 @@
 # Konta z seeda (V7): client / client2 / employee / admin @rentengine.local
-# Każde logowanie zapisuje token w {{token}}, którego używają pozostałe pliki .http
+# Każde logowanie zapisuje token swojej roli ({{clientToken}}, {{adminToken}}...), którego używają pozostałe pliki .http
 
-### Logowanie jako klient
+### Logowanie jako klient (Jan Kowalski)
 POST {{host}}/api/auth/login
 Content-Type: application/json
 
@@ -10,7 +10,18 @@ Content-Type: application/json
   "password": "Client123!"
 }
 
-> {% client.global.set("token", response.body.accessToken); %}
+> {% client.global.set("clientToken", response.body.accessToken); %}
+
+### Logowanie jako drugi klient (Anna Nowak)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "client2@rentengine.local",
+  "password": "Client123!"
+}
+
+> {% client.global.set("client2Token", response.body.accessToken); %}
 
 ### Logowanie jako pracownik
 POST {{host}}/api/auth/login
@@ -21,7 +32,7 @@ Content-Type: application/json
   "password": "Employee123!"
 }
 
-> {% client.global.set("token", response.body.accessToken); %}
+> {% client.global.set("employeeToken", response.body.accessToken); %}
 
 ### Logowanie jako admin
 POST {{host}}/api/auth/login
@@ -32,7 +43,7 @@ Content-Type: application/json
   "password": "Admin123!"
 }
 
-> {% client.global.set("token", response.body.accessToken); %}
+> {% client.global.set("adminToken", response.body.accessToken); %}
 
 ### Złe hasło → 401
 POST {{host}}/api/auth/login
@@ -53,8 +64,6 @@ Content-Type: application/json
   "firstName": "Ola",
   "lastName": "Nowicka"
 }
-
-> {% client.global.set("token", response.body.accessToken); %}
 
 ### Zajęty email → 409 EMAIL_TAKEN
 POST {{host}}/api/auth/register

@@ -5,6 +5,7 @@ import com.wzabek.rentengine.catalog.entity.EquipmentUnit;
 import com.wzabek.rentengine.catalog.entity.UnitStatus;
 import com.wzabek.rentengine.catalog.repository.EquipmentUnitRepository;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
+import com.wzabek.rentengine.common.exception.ForbiddenOperationException;
 import com.wzabek.rentengine.common.exception.InvalidRequestException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
 import com.wzabek.rentengine.rental.dto.RentalRequest;
@@ -15,13 +16,16 @@ import com.wzabek.rentengine.rental.mapper.RentalMapper;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
 import com.wzabek.rentengine.settlement.pricing.PricingCalculator;
 import com.wzabek.rentengine.settlement.repository.SettlementRepository;
+import com.wzabek.rentengine.user.entity.Role;
 import com.wzabek.rentengine.user.entity.User;
 import com.wzabek.rentengine.user.repository.UserRepository;
+import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -36,17 +40,26 @@ public class RentalService {
     private final PricingCalculator pricingCalculator;
     private final RentalMapper mapper;
 
-    public RentalResponse findById(Long id) {
-        return mapper.toResponse(getAgreement(id));
+    public RentalResponse findById(Long id, AuthenticatedUser user) {
+        RentalAgreement agreement = getAgreement(id);
+        checkAccess(agreement, user);
+        return mapper.toResponse(agreement);
+    }
+
+    public List<RentalResponse> findByClient(Long clientId) {
+        return agreementRepository.findByClientIdOrderByStartDateDesc(clientId).stream()
+                .map(mapper::toResponse)
+                .toList();
     }
 
     @Transactional
-    public RentalResponse reserve(RentalRequest request) {
+    public RentalResponse reserve(RentalRequest request, Long clientId) {
         if (!request.endDate().isAfter(request.startDate())) {
             throw new InvalidRequestException(Map.of("endDate", "must be after startDate"));
         }
-        User client = userRepository.findById(request.clientId())
-                .orElseThrow(() -> new NotFoundException("User", request.clientId()));
+        // Token może przeżyć usunięcie konta, więc klienta i tak szukamy w bazie
+        User client = userRepository.findById(clientId)
+                .orElseThrow(() -> new NotFoundException("User", clientId));
         EquipmentUnit unit = unitRepository.findByIdForReservation(request.unitId())
                 .orElseThrow(() -> new NotFoundException("Unit", request.unitId()));
 
@@ -74,10 +87,11 @@ public class RentalService {
         return mapper.toResponse(agreementRepository.save(agreement));
     }
 
-    // R8 pilnuje, że anulować można tylko RESERVED. Sprawdzenie właściciela dojdzie w Dniu 5.
+    // Klient anuluje tylko swoją umowę, admin każdą; R8 pilnuje, że tylko RESERVED
     @Transactional
-    public RentalResponse cancel(Long id) {
+    public RentalResponse cancel(Long id, AuthenticatedUser user) {
         RentalAgreement agreement = getAgreement(id);
+        checkAccess(agreement, user);
         agreement.changeStatus(AgreementStatus.CANCELLED);
         return mapper.toResponse(agreement);
     }
@@ -85,5 +99,11 @@ public class RentalService {
     public RentalAgreement getAgreement(Long id) {
         return agreementRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Rental agreement", id));
+    }
+
+    private static void checkAccess(RentalAgreement agreement, AuthenticatedUser user) {
+        if (user.role() == Role.CLIENT && !agreement.getClient().getId().equals(user.id())) {
+            throw new ForbiddenOperationException("You can only access your own rental agreements");
+        }
     }
 }

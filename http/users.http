@@ -1,0 +1,74 @@
+# Tylko ADMIN. Najpierw logowania w auth.http (adminToken, clientToken).
+
+### Lista użytkowników
+GET {{host}}/api/users
+Authorization: Bearer {{adminToken}}
+
+### Szczegóły użytkownika
+GET {{host}}/api/users/3
+Authorization: Bearer {{adminToken}}
+
+### Klient nie ma dostępu → 403
+GET {{host}}/api/users
+Authorization: Bearer {{clientToken}}
+
+### Nowy pracownik → 201 (zmień email przy kolejnym uruchomieniu)
+POST {{host}}/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "pracownik2@rentengine.local",
+  "password": "Employee123!",
+  "firstName": "Piotr",
+  "lastName": "Wiśniewski",
+  "role": "EMPLOYEE"
+}
+
+> {% client.global.set("userId", response.body.id); %}
+
+### Zajęty email → 409 EMAIL_TAKEN
+POST {{host}}/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "client@rentengine.local",
+  "password": "Haslo1234",
+  "firstName": "Jan",
+  "lastName": "Kowalski",
+  "role": "CLIENT"
+}
+
+### Edycja: zmiana roli i hasła (password można pominąć, wtedy zostaje stare)
+PUT {{host}}/api/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "pracownik2@rentengine.local",
+  "password": "NoweHaslo123!",
+  "firstName": "Piotr",
+  "lastName": "Wiśniewski",
+  "role": "ADMIN"
+}
+
+### Admin nie zmieni sobie roli → 409 CANNOT_CHANGE_OWN_ROLE
+PUT {{host}}/api/users/4
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "admin@rentengine.local",
+  "firstName": "Admin",
+  "lastName": "RentEngine",
+  "role": "CLIENT"
+}
+
+### Admin nie usunie siebie → 409 CANNOT_DELETE_SELF
+DELETE {{host}}/api/users/4
+Authorization: Bearer {{adminToken}}
+
+### Usunięcie utworzonego użytkownika → 204
+DELETE {{host}}/api/users/{{userId}}
+Authorization: Bearer {{adminToken}}

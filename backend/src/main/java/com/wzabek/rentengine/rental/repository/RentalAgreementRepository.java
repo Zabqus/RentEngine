@@ -9,11 +9,17 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface RentalAgreementRepository extends JpaRepository<RentalAgreement, Long>, JpaSpecificationExecutor<RentalAgreement> {
 
     boolean existsByUnitId(Long unitId);
+
+    boolean existsByClientId(Long clientId);
+
+    @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
+    List<RentalAgreement> findByClientIdOrderByStartDateDesc(Long clientId);
 
     boolean existsByUnitIdAndStatusIn(Long unitId, Collection<AgreementStatus> statuses);
 

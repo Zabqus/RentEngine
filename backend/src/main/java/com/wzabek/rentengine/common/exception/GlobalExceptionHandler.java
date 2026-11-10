@@ -39,9 +39,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return pd;
     }
 
-    @ExceptionHandler({ForbiddenOperationException.class, AccessDeniedException.class})
-    ProblemDetail handleForbidden(RuntimeException ex) {
+    @ExceptionHandler(ForbiddenOperationException.class)
+    ProblemDetail handleForbidden(ForbiddenOperationException ex) {
         return problem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
+    }
+
+    // Brak wymaganej roli (@PreAuthorize); Spring daje tu tylko ogólne "Access Denied"
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        return problem(HttpStatus.FORBIDDEN, "Forbidden", "You do not have permission to perform this operation");
     }
 
     @ExceptionHandler(AuthenticationException.class)

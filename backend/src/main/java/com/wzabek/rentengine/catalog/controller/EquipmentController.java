@@ -6,6 +6,7 @@ import com.wzabek.rentengine.catalog.service.EquipmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -29,6 +30,7 @@ public class EquipmentController {
         return equipmentService.findById(id);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<EquipmentResponse> create(@Valid @RequestBody EquipmentRequest request) {
         EquipmentResponse created = equipmentService.create(request);
@@ -39,11 +41,13 @@ public class EquipmentController {
         return ResponseEntity.created(location).body(created);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public EquipmentResponse update(@PathVariable Long id, @Valid @RequestBody EquipmentRequest request) {
         return equipmentService.update(id, request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         equipmentService.delete(id);

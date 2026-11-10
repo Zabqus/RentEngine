@@ -45,9 +45,9 @@ class RentalConcurrencyTest {
         // Transakcja A rezerwuje, ale zanim zrobi commit, transakcja B (inny wątek) rezerwuje i commituje.
         // Obie przeszły sprawdzenie kolizji (R1), więc chroni nas tylko @Version egzemplarza.
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
-            rentalService.reserve(new RentalRequest(CLIENT_ID, UNIT_ID, start, start.plusDays(2)));
+            rentalService.reserve(new RentalRequest(UNIT_ID, start, start.plusDays(2)), CLIENT_ID);
             CompletableFuture.runAsync(() ->
-                    rentalService.reserve(new RentalRequest(CLIENT2_ID, UNIT_ID, start.plusDays(1), start.plusDays(3)))
+                    rentalService.reserve(new RentalRequest(UNIT_ID, start.plusDays(1), start.plusDays(3)), CLIENT2_ID)
             ).join();
         })).isInstanceOf(ObjectOptimisticLockingFailureException.class);
 

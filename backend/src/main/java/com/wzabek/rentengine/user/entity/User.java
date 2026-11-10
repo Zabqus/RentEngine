@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Locale;
+
 @Entity
 @Table(name = "users") // "user" to słowo zastrzeżone w PostgreSQL
 @Getter
@@ -39,5 +41,10 @@ public class User {
         this.firstName = firstName;
         this.lastName = lastName;
         this.role = role;
+    }
+
+    // Emaile trzymamy małymi literami, żeby "Jan@X.pl" i "jan@x.pl" były tym samym kontem
+    public static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

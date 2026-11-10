@@ -1,4 +1,4 @@
-# Zapis w katalogu wymaga tokena: najpierw uruchom logowanie w auth.http (na razie wystarczy dowolne konto, role od Części 3)
+# Zapis w katalogu: tylko ADMIN (zmiana statusu egzemplarza także EMPLOYEE). Najpierw logowania w auth.http.
 
 ### Lista kategorii
 GET {{host}}/api/categories
@@ -11,7 +11,7 @@ GET {{host}}/api/categories/999
 
 ### Nowa kategoria → 201 + Location
 POST {{host}}/api/categories
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -24,7 +24,7 @@ Content-Type: application/json
 
 ### Edycja utworzonej kategorii
 PUT {{host}}/api/categories/{{categoryId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -35,7 +35,7 @@ Content-Type: application/json
 
 ### Duplikat nazwy → 409 CATEGORY_NAME_TAKEN
 POST {{host}}/api/categories
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -46,7 +46,7 @@ Content-Type: application/json
 
 ### Błędy walidacji → 400 z polem errors
 POST {{host}}/api/categories
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -56,7 +56,7 @@ Content-Type: application/json
 
 ### Nowy wymagany parametr, którego nie ma istniejący sprzęt → 409 CATEGORY_PARAMS_CONFLICT
 PUT {{host}}/api/categories/1
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -67,11 +67,11 @@ Content-Type: application/json
 
 ### Usunięcie kategorii ze sprzętem → 409 CATEGORY_IN_USE
 DELETE {{host}}/api/categories/1
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ### Usunięcie utworzonej kategorii → 204
 DELETE {{host}}/api/categories/{{categoryId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 # ======================== SPRZĘT ========================
 
@@ -83,7 +83,7 @@ GET {{host}}/api/equipment/3
 
 ### Nowy sprzęt → 201 (dodatkowy parametr "cabin" jest dozwolony)
 POST {{host}}/api/equipment
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -99,7 +99,7 @@ Content-Type: application/json
 
 ### Brak parametrów wymaganych przez kategorię → 400 z polami params.*
 POST {{host}}/api/equipment
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -112,7 +112,7 @@ Content-Type: application/json
 
 ### Edycja sprzętu
 PUT {{host}}/api/equipment/{{equipmentId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -134,7 +134,7 @@ GET {{host}}/api/units?equipmentId=3
 
 ### Nowy egzemplarz → 201 (numer jest zapisywany wielkimi literami)
 POST {{host}}/api/units
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -147,7 +147,7 @@ Content-Type: application/json
 
 ### Duplikat numeru → 409 UNIT_SERIAL_TAKEN
 POST {{host}}/api/units
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -158,7 +158,7 @@ Content-Type: application/json
 
 ### Edycja egzemplarza
 PUT {{host}}/api/units/{{unitId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -169,7 +169,7 @@ Content-Type: application/json
 
 ### Zmiana statusu (serwis ↔ dostępny)
 PATCH {{host}}/api/units/{{unitId}}/status
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -178,12 +178,46 @@ Content-Type: application/json
 
 ### Usunięcie sprzętu z egzemplarzami → 409 EQUIPMENT_HAS_UNITS
 DELETE {{host}}/api/equipment/{{equipmentId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ### Usunięcie egzemplarza → 204
 DELETE {{host}}/api/units/{{unitId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
 ### Usunięcie sprzętu → 204
 DELETE {{host}}/api/equipment/{{equipmentId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
+
+# ======================== ROLE ========================
+
+### Klient próbuje dodać kategorię → 403
+POST {{host}}/api/categories
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "name": "Nielegalna",
+  "type": "CAR",
+  "requiredParams": []
+}
+
+### Bez tokena → 401
+DELETE {{host}}/api/categories/1
+
+### Pracownik wysyła egzemplarz do serwisu → 200
+PATCH {{host}}/api/units/6/status
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "status": "IN_SERVICE"
+}
+
+### Pracownik przywraca egzemplarz → 200
+PATCH {{host}}/api/units/6/status
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "status": "AVAILABLE"
+}

@@ -15,8 +15,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Locale;
-
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -30,7 +28,7 @@ public class AuthService {
     // Rejestracja zawsze tworzy klienta; konta pracowników i adminów zakłada admin
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String email = normalizeEmail(request.email());
+        String email = User.normalizeEmail(request.email());
         if (userRepository.existsByEmail(email)) {
             throw new BusinessRuleException("EMAIL_TAKEN", "Email '%s' is already registered".formatted(email));
         }
@@ -40,7 +38,7 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(normalizeEmail(request.email()))
+        User user = userRepository.findByEmail(User.normalizeEmail(request.email()))
                 .filter(u -> passwordEncoder.matches(request.password(), u.getPasswordHash()))
                 // Ten sam komunikat dla złego emaila i hasła, żeby nie zdradzać, które konta istnieją
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
@@ -50,9 +48,5 @@ public class AuthService {
     private AuthResponse authResponse(User user) {
         return AuthResponse.bearer(jwtService.generateToken(user), jwtService.expirationSeconds(),
                 mapper.toResponse(user));
-    }
-
-    private static String normalizeEmail(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

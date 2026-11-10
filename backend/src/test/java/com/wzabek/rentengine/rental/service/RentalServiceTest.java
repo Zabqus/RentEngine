@@ -7,6 +7,7 @@ import com.wzabek.rentengine.catalog.entity.EquipmentUnit;
 import com.wzabek.rentengine.catalog.entity.UnitStatus;
 import com.wzabek.rentengine.catalog.repository.EquipmentUnitRepository;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
+import com.wzabek.rentengine.common.exception.ForbiddenOperationException;
 import com.wzabek.rentengine.common.exception.InvalidRequestException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
 import com.wzabek.rentengine.rental.dto.RentalRequest;
@@ -20,12 +21,14 @@ import com.wzabek.rentengine.settlement.repository.SettlementRepository;
 import com.wzabek.rentengine.user.entity.Role;
 import com.wzabek.rentengine.user.entity.User;
 import com.wzabek.rentengine.user.repository.UserRepository;
+import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,6 +47,11 @@ import static org.mockito.Mockito.when;
 class RentalServiceTest {
 
     private static final LocalDateTime START = LocalDateTime.of(2030, 6, 1, 10, 0);
+    private static final Long CLIENT_ID = 1L;
+    private static final AuthenticatedUser OWNER = new AuthenticatedUser(CLIENT_ID, "jan@test.pl", Role.CLIENT);
+    private static final AuthenticatedUser OTHER_CLIENT = new AuthenticatedUser(2L, "anna@test.pl", Role.CLIENT);
+    private static final AuthenticatedUser EMPLOYEE = new AuthenticatedUser(3L, "emp@test.pl", Role.EMPLOYEE);
+    private static final AuthenticatedUser ADMIN = new AuthenticatedUser(4L, "admin@test.pl", Role.ADMIN);
 
     @Mock
     private RentalAgreementRepository agreementRepository;
@@ -64,6 +72,7 @@ class RentalServiceTest {
                 new PricingCalculator(), new RentalMapper());
 
         client = new User("jan@test.pl", "hash", "Jan", "Kowalski", Role.CLIENT);
+        ReflectionTestUtils.setField(client, "id", CLIENT_ID);
         Category category = new Category("Minikoparki", CategoryType.EXCAVATOR, List.of());
         Equipment equipment = new Equipment("Kubota U17-3", category, new BigDecimal("450.00"),
                 new BigDecimal("3000.00"), null, Map.of());
@@ -75,7 +84,7 @@ class RentalServiceTest {
         givenClientAndUnit();
         when(agreementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        RentalResponse response = service.reserve(request(START, START.plusHours(49)));
+        RentalResponse response = service.reserve(request(START, START.plusHours(49)), CLIENT_ID);
 
         ArgumentCaptor<RentalAgreement> saved = ArgumentCaptor.forClass(RentalAgreement.class);
         verify(agreementRepository).save(saved.capture());
@@ -89,7 +98,7 @@ class RentalServiceTest {
         givenClientAndUnit();
         when(agreementRepository.existsOverlapping(any(), any(), any())).thenReturn(true);
 
-        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(2))))
+        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(2)), CLIENT_ID))
                 .isInstanceOf(BusinessRuleException.class)
                 .extracting("code").isEqualTo("UNIT_NOT_AVAILABLE");
         verify(agreementRepository, never()).save(any());
@@ -100,7 +109,7 @@ class RentalServiceTest {
         givenClientAndUnit();
         unit.setStatus(UnitStatus.IN_SERVICE);
 
-        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(2))))
+        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(2)), CLIENT_ID))
                 .isInstanceOf(BusinessRuleException.class)
                 .extracting("code").isEqualTo("UNIT_IN_SERVICE");
         verify(agreementRepository, never()).save(any());
@@ -111,7 +120,7 @@ class RentalServiceTest {
         givenClientAndUnit();
         when(settlementRepository.existsByAgreementClientIdAndPaidFalse(any())).thenReturn(true);
 
-        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(2))))
+        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(2)), CLIENT_ID))
                 .isInstanceOf(BusinessRuleException.class)
                 .extracting("code").isEqualTo("UNPAID_SETTLEMENT");
         verify(agreementRepository, never()).save(any());
@@ -119,7 +128,7 @@ class RentalServiceTest {
 
     @Test
     void endBeforeStartIsRejectedBeforeAnyLookup() {
-        assertThatThrownBy(() -> service.reserve(request(START, START.minusHours(1))))
+        assertThatThrownBy(() -> service.reserve(request(START, START.minusHours(1)), CLIENT_ID))
                 .isInstanceOf(InvalidRequestException.class);
         verify(unitRepository, never()).findByIdForReservation(any());
     }
@@ -129,16 +138,16 @@ class RentalServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(client));
         when(unitRepository.findByIdForReservation(2L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(1))))
+        assertThatThrownBy(() -> service.reserve(request(START, START.plusDays(1)), CLIENT_ID))
                 .isInstanceOf(NotFoundException.class);
     }
 
     @Test
-    void reservedAgreementCanBeCancelled() {
+    void reservedAgreementCanBeCancelledByOwner() {
         RentalAgreement agreement = agreement();
         when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement));
 
-        RentalResponse response = service.cancel(10L);
+        RentalResponse response = service.cancel(10L, OWNER);
 
         assertThat(response.status()).isEqualTo(AgreementStatus.CANCELLED);
     }
@@ -149,10 +158,42 @@ class RentalServiceTest {
         agreement.changeStatus(AgreementStatus.ACTIVE);
         when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement));
 
-        assertThatThrownBy(() -> service.cancel(10L))
+        assertThatThrownBy(() -> service.cancel(10L, OWNER))
                 .isInstanceOf(BusinessRuleException.class)
                 .extracting("code").isEqualTo("INVALID_STATUS_TRANSITION");
         assertThat(agreement.getStatus()).isEqualTo(AgreementStatus.ACTIVE);
+    }
+
+    @Test
+    void otherClientCannotCancelAgreement() {
+        RentalAgreement agreement = agreement();
+        when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement));
+
+        assertThatThrownBy(() -> service.cancel(10L, OTHER_CLIENT))
+                .isInstanceOf(ForbiddenOperationException.class);
+        assertThat(agreement.getStatus()).isEqualTo(AgreementStatus.RESERVED);
+    }
+
+    @Test
+    void adminCanCancelAnyAgreement() {
+        when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement()));
+
+        assertThat(service.cancel(10L, ADMIN).status()).isEqualTo(AgreementStatus.CANCELLED);
+    }
+
+    @Test
+    void otherClientCannotSeeAgreement() {
+        when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement()));
+
+        assertThatThrownBy(() -> service.findById(10L, OTHER_CLIENT))
+                .isInstanceOf(ForbiddenOperationException.class);
+    }
+
+    @Test
+    void employeeCanSeeAnyAgreement() {
+        when(agreementRepository.findById(10L)).thenReturn(Optional.of(agreement()));
+
+        assertThat(service.findById(10L, EMPLOYEE).clientId()).isEqualTo(CLIENT_ID);
     }
 
     private RentalAgreement agreement() {
@@ -166,6 +207,6 @@ class RentalServiceTest {
     }
 
     private static RentalRequest request(LocalDateTime start, LocalDateTime end) {
-        return new RentalRequest(1L, 2L, start, end);
+        return new RentalRequest(2L, start, end);
     }
 }

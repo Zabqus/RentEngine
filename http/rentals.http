@@ -1,14 +1,12 @@
-# Uwaga: clientId w body jest TYMCZASOWY. W Dniu 5 klient będzie brany z tokena JWT.
-# Klienci z seeda: 1 = Jan Kowalski, 2 = Anna Nowak. Egzemplarz 5 (KUB-U17-0002) jest w serwisie.
-# Token: najpierw logowanie w auth.http.
+# Klient jest brany z tokena. Najpierw logowania w auth.http (clientToken, client2Token, employeeToken, adminToken).
+# Klienci z seeda: client = Jan Kowalski, client2 = Anna Nowak. Egzemplarz 5 (KUB-U17-0002) jest w serwisie.
 
-### Rezerwacja → 201 (49 h = 3 doby × 450 zł = 1350 zł)
+### Rezerwacja Jana → 201 (49 h = 3 doby × 450 zł = 1350 zł)
 POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
+Authorization: Bearer {{clientToken}}
 Content-Type: application/json
 
 {
-  "clientId": 1,
   "unitId": 4,
   "startDate": "2027-01-10T10:00",
   "endDate": "2027-01-12T11:00"
@@ -16,29 +14,50 @@ Content-Type: application/json
 
 > {% client.global.set("rentalId", response.body.id); %}
 
-### Szczegóły umowy
-GET {{host}}/api/rentals/{{rentalId}}
-Authorization: Bearer {{token}}
+### Moje umowy (Jan)
+GET {{host}}/api/rentals/my
+Authorization: Bearer {{clientToken}}
 
-### R1: nakładający się termin → 409 UNIT_NOT_AVAILABLE
+### Szczegóły umowy (właściciel)
+GET {{host}}/api/rentals/{{rentalId}}
+Authorization: Bearer {{clientToken}}
+
+### Inny klient nie widzi cudzej umowy → 403
+GET {{host}}/api/rentals/{{rentalId}}
+Authorization: Bearer {{client2Token}}
+
+### Pracownik widzi każdą umowę → 200
+GET {{host}}/api/rentals/{{rentalId}}
+Authorization: Bearer {{employeeToken}}
+
+### Admin nie rezerwuje (tylko klient) → 403
 POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
-  "clientId": 2,
+  "unitId": 4,
+  "startDate": "2027-05-10T10:00",
+  "endDate": "2027-05-11T10:00"
+}
+
+### R1: Anna w nakładającym się terminie → 409 UNIT_NOT_AVAILABLE
+POST {{host}}/api/rentals
+Authorization: Bearer {{client2Token}}
+Content-Type: application/json
+
+{
   "unitId": 4,
   "startDate": "2027-01-12T09:00",
   "endDate": "2027-01-14T10:00"
 }
 
-### Rezerwacja zaczynająca się dokładnie o końcu poprzedniej → 201
+### Rezerwacja Anny zaczynająca się dokładnie o końcu poprzedniej → 201
 POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
+Authorization: Bearer {{client2Token}}
 Content-Type: application/json
 
 {
-  "clientId": 2,
   "unitId": 4,
   "startDate": "2027-01-12T11:00",
   "endDate": "2027-01-13T11:00"
@@ -48,11 +67,10 @@ Content-Type: application/json
 
 ### R2: egzemplarz w serwisie → 409 UNIT_IN_SERVICE
 POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
+Authorization: Bearer {{clientToken}}
 Content-Type: application/json
 
 {
-  "clientId": 1,
   "unitId": 5,
   "startDate": "2027-01-10T10:00",
   "endDate": "2027-01-11T10:00"
@@ -60,11 +78,10 @@ Content-Type: application/json
 
 ### Błędne daty → 400 (koniec przed początkiem)
 POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
+Authorization: Bearer {{clientToken}}
 Content-Type: application/json
 
 {
-  "clientId": 1,
   "unitId": 4,
   "startDate": "2027-02-10T10:00",
   "endDate": "2027-02-09T10:00"
@@ -72,11 +89,10 @@ Content-Type: application/json
 
 ### Start w przeszłości → 400
 POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
+Authorization: Bearer {{clientToken}}
 Content-Type: application/json
 
 {
-  "clientId": 1,
   "unitId": 4,
   "startDate": "2020-01-01T10:00",
   "endDate": "2020-01-02T10:00"
@@ -84,34 +100,24 @@ Content-Type: application/json
 
 ### Nieistniejąca umowa → 404
 GET {{host}}/api/rentals/999999
-Authorization: Bearer {{token}}
+Authorization: Bearer {{clientToken}}
 
-### Anulowanie rezerwacji → 200, status CANCELLED
+### Anna próbuje anulować umowę Jana → 403
 PATCH {{host}}/api/rentals/{{rentalId}}/cancel
-Authorization: Bearer {{token}}
+Authorization: Bearer {{client2Token}}
+
+### Pracownik nie anuluje umów → 403
+PATCH {{host}}/api/rentals/{{rentalId}}/cancel
+Authorization: Bearer {{employeeToken}}
+
+### Jan anuluje swoją rezerwację → 200, status CANCELLED
+PATCH {{host}}/api/rentals/{{rentalId}}/cancel
+Authorization: Bearer {{clientToken}}
 
 ### R8: ponowne anulowanie → 409 INVALID_STATUS_TRANSITION
 PATCH {{host}}/api/rentals/{{rentalId}}/cancel
-Authorization: Bearer {{token}}
+Authorization: Bearer {{clientToken}}
 
-### Po anulowaniu termin jest znów wolny → 201
-POST {{host}}/api/rentals
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "clientId": 2,
-  "unitId": 4,
-  "startDate": "2027-01-10T10:00",
-  "endDate": "2027-01-11T10:00"
-}
-
-> {% client.global.set("rentalId3", response.body.id); %}
-
-### Sprzątanie, żeby plik dało się puścić ponownie
+### Admin anuluje umowę Anny (może każdą) → 200; po tym plik da się puścić ponownie
 PATCH {{host}}/api/rentals/{{rentalId2}}/cancel
-Authorization: Bearer {{token}}
-
-###
-PATCH {{host}}/api/rentals/{{rentalId3}}/cancel
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
