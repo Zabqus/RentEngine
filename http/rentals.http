@@ -1,8 +1,10 @@
 # Uwaga: clientId w body jest TYMCZASOWY. W Dniu 5 klient będzie brany z tokena JWT.
 # Klienci z seeda: 1 = Jan Kowalski, 2 = Anna Nowak. Egzemplarz 5 (KUB-U17-0002) jest w serwisie.
+# Token: najpierw logowanie w auth.http.
 
 ### Rezerwacja → 201 (49 h = 3 doby × 450 zł = 1350 zł)
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -16,9 +18,11 @@ Content-Type: application/json
 
 ### Szczegóły umowy
 GET {{host}}/api/rentals/{{rentalId}}
+Authorization: Bearer {{token}}
 
 ### R1: nakładający się termin → 409 UNIT_NOT_AVAILABLE
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -30,6 +34,7 @@ Content-Type: application/json
 
 ### Rezerwacja zaczynająca się dokładnie o końcu poprzedniej → 201
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -43,6 +48,7 @@ Content-Type: application/json
 
 ### R2: egzemplarz w serwisie → 409 UNIT_IN_SERVICE
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -54,6 +60,7 @@ Content-Type: application/json
 
 ### Błędne daty → 400 (koniec przed początkiem)
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -65,6 +72,7 @@ Content-Type: application/json
 
 ### Start w przeszłości → 400
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -76,15 +84,19 @@ Content-Type: application/json
 
 ### Nieistniejąca umowa → 404
 GET {{host}}/api/rentals/999999
+Authorization: Bearer {{token}}
 
 ### Anulowanie rezerwacji → 200, status CANCELLED
 PATCH {{host}}/api/rentals/{{rentalId}}/cancel
+Authorization: Bearer {{token}}
 
 ### R8: ponowne anulowanie → 409 INVALID_STATUS_TRANSITION
 PATCH {{host}}/api/rentals/{{rentalId}}/cancel
+Authorization: Bearer {{token}}
 
 ### Po anulowaniu termin jest znów wolny → 201
 POST {{host}}/api/rentals
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -98,6 +110,8 @@ Content-Type: application/json
 
 ### Sprzątanie, żeby plik dało się puścić ponownie
 PATCH {{host}}/api/rentals/{{rentalId2}}/cancel
+Authorization: Bearer {{token}}
 
 ###
 PATCH {{host}}/api/rentals/{{rentalId3}}/cancel
+Authorization: Bearer {{token}}

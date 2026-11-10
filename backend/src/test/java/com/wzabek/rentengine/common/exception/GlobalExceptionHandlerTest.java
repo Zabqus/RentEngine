@@ -1,10 +1,10 @@
 package com.wzabek.rentengine.common.exception;
 
-import com.wzabek.rentengine.common.config.SecurityConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -21,8 +21,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Bez filtrów security: tu testujemy tylko mapowanie wyjątków (security ma własny test)
 @WebMvcTest(GlobalExceptionHandlerTest.ThrowingController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandlerTest.ThrowingController.class})
+@AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandlerTest.ThrowingController.class)
 class GlobalExceptionHandlerTest {
 
     @Autowired

@@ -1,5 +1,6 @@
 package com.wzabek.rentengine.user.security;
 
+import com.wzabek.rentengine.user.entity.Role;
 import com.wzabek.rentengine.user.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -48,6 +49,12 @@ public class JwtService {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public AuthenticatedUser parseUser(String token) throws JwtException {
+        Claims claims = parse(token);
+        return new AuthenticatedUser(Long.valueOf(claims.getSubject()), claims.get("email", String.class),
+                Role.valueOf(claims.get("role", String.class)));
     }
 
     public long expirationSeconds() {

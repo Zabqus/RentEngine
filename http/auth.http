@@ -1,0 +1,79 @@
+# Konta z seeda (V7): client / client2 / employee / admin @rentengine.local
+# Każde logowanie zapisuje token w {{token}}, którego używają pozostałe pliki .http
+
+### Logowanie jako klient
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "client@rentengine.local",
+  "password": "Client123!"
+}
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### Logowanie jako pracownik
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "employee@rentengine.local",
+  "password": "Employee123!"
+}
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### Logowanie jako admin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@rentengine.local",
+  "password": "Admin123!"
+}
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### Złe hasło → 401
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@rentengine.local",
+  "password": "wrong"
+}
+
+### Rejestracja nowego klienta → 201 + token (zmień email przy kolejnym uruchomieniu)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "nowy.klient@example.com",
+  "password": "Haslo1234",
+  "firstName": "Ola",
+  "lastName": "Nowicka"
+}
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### Zajęty email → 409 EMAIL_TAKEN
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "client@rentengine.local",
+  "password": "Haslo1234",
+  "firstName": "Jan",
+  "lastName": "Kowalski"
+}
+
+### Błędy walidacji → 400
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "password": "short",
+  "firstName": "",
+  "lastName": "X"
+}
