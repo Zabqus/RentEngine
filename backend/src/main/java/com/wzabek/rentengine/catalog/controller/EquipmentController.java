@@ -3,6 +3,7 @@ package com.wzabek.rentengine.catalog.controller;
 import com.wzabek.rentengine.catalog.dto.EquipmentRequest;
 import com.wzabek.rentengine.catalog.dto.EquipmentResponse;
 import com.wzabek.rentengine.catalog.service.EquipmentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
+@Tag(name = "Equipment")
 @RequestMapping("/api/equipment")
 @RequiredArgsConstructor
 public class EquipmentController {

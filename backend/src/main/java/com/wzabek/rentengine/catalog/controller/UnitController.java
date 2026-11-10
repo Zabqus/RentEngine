@@ -4,6 +4,7 @@ import com.wzabek.rentengine.catalog.dto.UnitRequest;
 import com.wzabek.rentengine.catalog.dto.UnitResponse;
 import com.wzabek.rentengine.catalog.dto.UnitStatusRequest;
 import com.wzabek.rentengine.catalog.service.UnitService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
+@Tag(name = "Units")
 @RequestMapping("/api/units")
 @RequiredArgsConstructor
 public class UnitController {

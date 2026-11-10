@@ -5,6 +5,7 @@ import com.wzabek.rentengine.user.dto.UserResponse;
 import com.wzabek.rentengine.user.dto.UserUpdateRequest;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import com.wzabek.rentengine.user.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
+@Tag(name = "Users")
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")

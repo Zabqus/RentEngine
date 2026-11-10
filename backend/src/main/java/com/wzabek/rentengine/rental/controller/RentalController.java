@@ -4,6 +4,7 @@ import com.wzabek.rentengine.rental.dto.RentalRequest;
 import com.wzabek.rentengine.rental.dto.RentalResponse;
 import com.wzabek.rentengine.rental.service.RentalService;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
+@Tag(name = "Rentals")
 @RequestMapping("/api/rentals")
 @RequiredArgsConstructor
 public class RentalController {
