@@ -21,7 +21,15 @@ public interface RentalAgreementRepository extends JpaRepository<RentalAgreement
     @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
     List<RentalAgreement> findByClientIdOrderByStartDateDesc(Long clientId);
 
+    @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
+    List<RentalAgreement> findAllByOrderByStartDateAsc();
+
+    @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
+    List<RentalAgreement> findByStatusOrderByStartDateAsc(AgreementStatus status);
+
     boolean existsByUnitIdAndStatusIn(Long unitId, Collection<AgreementStatus> statuses);
+
+    boolean existsByUnitIdAndStatusInAndIdNot(Long unitId, Collection<AgreementStatus> statuses, Long id);
 
     // R1: przedziały [start, end) nachodzą na siebie. OVERDUE blokuje bez końca, bo sprzęt jeszcze nie wrócił.
     @Query("""

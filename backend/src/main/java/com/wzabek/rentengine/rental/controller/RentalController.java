@@ -2,6 +2,7 @@ package com.wzabek.rentengine.rental.controller;
 
 import com.wzabek.rentengine.rental.dto.RentalRequest;
 import com.wzabek.rentengine.rental.dto.RentalResponse;
+import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.service.RentalService;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +35,12 @@ public class RentalController {
                 .buildAndExpand(created.id())
                 .toUri();
         return ResponseEntity.created(location).body(created);
+    }
+
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
+    @GetMapping
+    public List<RentalResponse> findAll(@RequestParam(required = false) AgreementStatus status) {
+        return rentalService.findAll(status);
     }
 
     @PreAuthorize("hasRole('CLIENT')")

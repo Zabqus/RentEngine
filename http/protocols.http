@@ -1,0 +1,165 @@
+# Protokoły wydania/zwrotu i uszkodzenia. Najpierw logowania w auth.http.
+# Wydać można najwcześniej w dniu startu umowy, więc rezerwacja startuje za chwilę (dzisiaj).
+# Egzemplarz 8 (HUS-TC242-0002): zbiornik 8.50 l. Liczniki bierzemy z jego aktualnego stanu, więc plik można puszczać wielokrotnie.
+
+### Aktualny licznik egzemplarza 8
+GET {{host}}/api/units/8
+
+> {%
+    client.global.set("issueHours", response.body.mileageOrHours);
+    client.global.set("returnHours", response.body.mileageOrHours + 6);
+%}
+
+### Rezerwacja Jana od za 2 minut na 2 doby → 201
+< {%
+    const fmt = d => {
+        const p = n => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    };
+    const start = new Date(Date.now() + 2 * 60 * 1000);
+    request.variables.set("start", fmt(start));
+    request.variables.set("end", fmt(new Date(start.getTime() + 2 * 24 * 60 * 60 * 1000)));
+%}
+POST {{host}}/api/rentals
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "unitId": 8,
+  "startDate": "{{start}}",
+  "endDate": "{{end}}"
+}
+
+> {% client.global.set("rentalId", response.body.id); %}
+
+### Lista umów do wydania (pracownik/admin), bez filtra zwraca wszystkie
+GET {{host}}/api/rentals?status=RESERVED
+Authorization: Bearer {{employeeToken}}
+
+### Klient nie widzi listy wszystkich umów → 403
+GET {{host}}/api/rentals
+Authorization: Bearer {{clientToken}}
+
+### Złe odczyty → 400 (paliwo ponad zbiornik, licznik mniejszy niż egzemplarza)
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "type": "ISSUE",
+  "fuelLevel": 9.00,
+  "mileageOrHours": 10
+}
+
+### Zwrot przed wydaniem → 409 INVALID_STATUS_TRANSITION
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "type": "RETURN",
+  "fuelLevel": 8.50,
+  "mileageOrHours": {{issueHours}}
+}
+
+### Wydanie → 201, umowa ACTIVE
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "type": "ISSUE",
+  "fuelLevel": 8.50,
+  "mileageOrHours": {{issueHours}},
+  "notes": "Full tank, small scratch on the hood"
+}
+
+> {% client.global.set("issueId", response.body.id); %}
+
+### Istniejące uszkodzenie przy wydaniu (MINOR, nie obciąża klienta)
+POST {{host}}/api/protocols/{{issueId}}/damages
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "description": "Small scratch on the hood",
+  "severity": "MINOR",
+  "cost": 0
+}
+
+### MAJOR na protokole wydania → 409 MAJOR_DAMAGE_ON_ISSUE
+POST {{host}}/api/protocols/{{issueId}}/damages
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "description": "Broken blade",
+  "severity": "MAJOR",
+  "cost": 900
+}
+
+### Admin nie spisuje protokołów (tylko pracownik) → 403
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "type": "RETURN",
+  "fuelLevel": 4.00,
+  "mileageOrHours": {{returnHours}}
+}
+
+### Zwrot → 201, umowa RETURNED, licznik egzemplarza = returnHours
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "type": "RETURN",
+  "fuelLevel": 4.00,
+  "mileageOrHours": {{returnHours}}
+}
+
+> {% client.global.set("returnId", response.body.id); %}
+
+### Uszkodzenie MINOR przy zwrocie → 201
+POST {{host}}/api/protocols/{{returnId}}/damages
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "description": "Scratched seat",
+  "severity": "MINOR",
+  "cost": 150.00
+}
+
+### R7: uszkodzenie MAJOR → 201, egzemplarz trafia do serwisu
+POST {{host}}/api/protocols/{{returnId}}/damages
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "description": "Broken blade",
+  "severity": "MAJOR",
+  "cost": 900.00
+}
+
+### Egzemplarz 8 ma teraz status IN_SERVICE
+GET {{host}}/api/units/8
+
+### Klient widzi protokoły swojej umowy z uszkodzeniami
+GET {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{clientToken}}
+
+### Inny klient → 403
+GET {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{client2Token}}
+
+### Przywrócenie egzemplarza z serwisu (żeby plik dało się puścić ponownie)
+PATCH {{host}}/api/units/8/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "AVAILABLE"
+}

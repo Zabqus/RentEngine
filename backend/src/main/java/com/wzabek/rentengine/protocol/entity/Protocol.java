@@ -50,6 +50,7 @@ public class Protocol {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @OrderBy("id")
     @OneToMany(mappedBy = "protocol", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Damage> damages = new ArrayList<>();
 

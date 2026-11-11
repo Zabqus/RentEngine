@@ -9,6 +9,8 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
 
     Optional<Settlement> findByAgreementId(Long agreementId);
 
+    boolean existsByAgreementId(Long agreementId);
+
     // R6
     boolean existsByAgreementClientIdAndPaidFalse(Long clientId);
 }

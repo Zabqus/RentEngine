@@ -41,9 +41,15 @@ public class RentalService {
     private final RentalMapper mapper;
 
     public RentalResponse findById(Long id, AuthenticatedUser user) {
-        RentalAgreement agreement = getAgreement(id);
-        checkAccess(agreement, user);
-        return mapper.toResponse(agreement);
+        return mapper.toResponse(getAccessibleAgreement(id, user));
+    }
+
+    // Lista dla personelu; paginacja dojdzie w Dniu 7
+    public List<RentalResponse> findAll(AgreementStatus status) {
+        List<RentalAgreement> agreements = status == null
+                ? agreementRepository.findAllByOrderByStartDateAsc()
+                : agreementRepository.findByStatusOrderByStartDateAsc(status);
+        return agreements.stream().map(mapper::toResponse).toList();
     }
 
     public List<RentalResponse> findByClient(Long clientId) {
@@ -99,6 +105,12 @@ public class RentalService {
     public RentalAgreement getAgreement(Long id) {
         return agreementRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Rental agreement", id));
+    }
+
+    public RentalAgreement getAccessibleAgreement(Long id, AuthenticatedUser user) {
+        RentalAgreement agreement = getAgreement(id);
+        checkAccess(agreement, user);
+        return agreement;
     }
 
     private static void checkAccess(RentalAgreement agreement, AuthenticatedUser user) {
