@@ -75,8 +75,23 @@ Authorization: Bearer {{adminToken}}
 
 # ======================== SPRZĘT ========================
 
-### Lista sprzętu
+### Lista sprzętu (strona 0, 20 pozycji, sortowanie po nazwie)
 GET {{host}}/api/equipment
+
+### Paginacja i sortowanie: druga strona po 3, od najdroższego
+GET {{host}}/api/equipment?page=1&size=3&sort=dailyPrice,desc
+
+### Wyszukiwanie po nazwie (bez względu na wielkość liter)
+GET {{host}}/api/equipment?q=kubota
+
+### Filtr: kategoria (2 = minikoparki) i zakres ceny dobowej
+GET {{host}}/api/equipment?categoryId=2&minPrice=400&maxPrice=600
+
+### Filtr dostępności: tylko sprzęt z wolnym egzemplarzem w tym terminie
+GET {{host}}/api/equipment?from=2027-01-10T10:00&to=2027-01-12T10:00
+
+### Złe filtry → 400 (min > max, samo from, nieznane pole sortowania)
+GET {{host}}/api/equipment?minPrice=500&maxPrice=100&from=2027-01-10T10:00&sort=foo
 
 ### Szczegóły sprzętu
 GET {{host}}/api/equipment/3

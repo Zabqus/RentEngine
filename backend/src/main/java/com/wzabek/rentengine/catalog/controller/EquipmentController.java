@@ -1,18 +1,22 @@
 package com.wzabek.rentengine.catalog.controller;
 
+import com.wzabek.rentengine.catalog.dto.EquipmentFilter;
 import com.wzabek.rentengine.catalog.dto.EquipmentRequest;
 import com.wzabek.rentengine.catalog.dto.EquipmentResponse;
 import com.wzabek.rentengine.catalog.service.EquipmentService;
+import com.wzabek.rentengine.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 @RestController
 @Tag(name = "Equipment")
@@ -22,9 +26,11 @@ public class EquipmentController {
 
     private final EquipmentService equipmentService;
 
+    // Np. ?categoryId=2&q=kubota&minPrice=100&maxPrice=500&from=2027-01-10T10:00&to=2027-01-12T10:00&page=0&size=20&sort=dailyPrice,desc
     @GetMapping
-    public List<EquipmentResponse> findAll() {
-        return equipmentService.findAll();
+    public PageResponse<EquipmentResponse> findAll(@Valid @ParameterObject EquipmentFilter filter,
+                                                   @ParameterObject @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return equipmentService.findAll(filter, pageable);
     }
 
     @GetMapping("/{id}")

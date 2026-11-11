@@ -20,6 +20,11 @@ spring:
   web:
     locale: en
     locale-resolver: fixed
+  # Strony od 0; za duże size Spring przycina do 100
+  data:
+    web:
+      pageable:
+        max-page-size: 100
   servlet:
     multipart:
       max-file-size: 5MB
