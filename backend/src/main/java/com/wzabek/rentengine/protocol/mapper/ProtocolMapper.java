@@ -32,7 +32,8 @@ public class ProtocolMapper {
                 damage.getProtocol().getId(),
                 damage.getDescription(),
                 damage.getSeverity(),
-                damage.getCost()
+                damage.getCost(),
+                damage.getPhotoPath() == null ? null : "/api/damages/%d/photo".formatted(damage.getId())
         );
     }
 }

@@ -5,6 +5,7 @@ import com.wzabek.rentengine.catalog.entity.UnitStatus;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
 import com.wzabek.rentengine.common.exception.InvalidRequestException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
+import com.wzabek.rentengine.protocol.dto.DamagePhoto;
 import com.wzabek.rentengine.protocol.dto.DamageRequest;
 import com.wzabek.rentengine.protocol.dto.DamageResponse;
 import com.wzabek.rentengine.protocol.dto.ProtocolRequest;
@@ -16,6 +17,7 @@ import com.wzabek.rentengine.protocol.entity.ProtocolType;
 import com.wzabek.rentengine.protocol.mapper.ProtocolMapper;
 import com.wzabek.rentengine.protocol.repository.DamageRepository;
 import com.wzabek.rentengine.protocol.repository.ProtocolRepository;
+import com.wzabek.rentengine.protocol.storage.PhotoStorage;
 import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
@@ -26,7 +28,10 @@ import com.wzabek.rentengine.user.repository.UserRepository;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -50,6 +55,7 @@ public class ProtocolService {
     private final UserRepository userRepository;
     private final RentalService rentalService;
     private final ProtocolMapper mapper;
+    private final PhotoStorage photoStorage;
     private final Clock clock;
 
     public List<ProtocolResponse> findByAgreement(Long agreementId, AuthenticatedUser user) {
@@ -87,11 +93,7 @@ public class ProtocolService {
                 .orElseThrow(() -> new NotFoundException("Protocol", protocolId));
         RentalAgreement agreement = protocol.getAgreement();
 
-        // Po rozliczeniu kwoty są zamknięte, nowe szkody by je rozjechały
-        if (settlementRepository.existsByAgreementId(agreement.getId())) {
-            throw new BusinessRuleException("AGREEMENT_SETTLED",
-                    "Settlement for this agreement already exists, damages cannot be added");
-        }
+        checkNotSettled(agreement);
         // Sprzęt z poważnym uszkodzeniem w ogóle nie powinien zostać wydany
         if (protocol.getType() == ProtocolType.ISSUE && request.severity() == DamageSeverity.MAJOR) {
             throw new BusinessRuleException("MAJOR_DAMAGE_ON_ISSUE",
@@ -107,6 +109,54 @@ public class ProtocolService {
             agreement.getUnit().setStatus(UnitStatus.IN_SERVICE);
         }
         return mapper.toResponse(damage);
+    }
+
+    @Transactional
+    public DamageResponse uploadPhoto(Long damageId, MultipartFile file) {
+        Damage damage = getDamage(damageId);
+        checkNotSettled(damage.getProtocol().getAgreement());
+
+        String previous = damage.getPhotoPath();
+        String stored = photoStorage.save(file);
+        damage.setPhotoPath(stored);
+        cleanUpAfterTransaction(previous, stored);
+        return mapper.toResponse(damage);
+    }
+
+    public DamagePhoto loadPhoto(Long damageId, AuthenticatedUser user) {
+        Damage damage = getDamage(damageId);
+        rentalService.getAccessibleAgreement(damage.getProtocol().getAgreement().getId(), user);
+        if (damage.getPhotoPath() == null) {
+            throw new NotFoundException("Photo of damage", damageId);
+        }
+        return new DamagePhoto(photoStorage.load(damage.getPhotoPath()), PhotoStorage.mediaType(damage.getPhotoPath()));
+    }
+
+    private Damage getDamage(Long id) {
+        return damageRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Damage", id));
+    }
+
+    // Po rozliczeniu kwoty są zamknięte, nowe szkody by je rozjechały
+    private void checkNotSettled(RentalAgreement agreement) {
+        if (settlementRepository.existsByAgreementId(agreement.getId())) {
+            throw new BusinessRuleException("AGREEMENT_SETTLED",
+                    "Settlement for this agreement already exists, damages cannot be changed");
+        }
+    }
+
+    // Plik i baza nie są w jednej transakcji: po commicie kasujemy stare zdjęcie, po rollbacku nowe
+    private void cleanUpAfterTransaction(String previous, String stored) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            photoStorage.delete(previous);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                photoStorage.delete(status == STATUS_COMMITTED ? previous : stored);
+            }
+        });
     }
 
     private void checkCanIssue(RentalAgreement agreement, EquipmentUnit unit) {

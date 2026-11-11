@@ -4,7 +4,10 @@ import com.jayway.jsonpath.JsonPath;
 import com.wzabek.rentengine.catalog.entity.EquipmentUnit;
 import com.wzabek.rentengine.catalog.entity.UnitStatus;
 import com.wzabek.rentengine.catalog.repository.EquipmentUnitRepository;
+import com.wzabek.rentengine.protocol.entity.Damage;
+import com.wzabek.rentengine.protocol.repository.DamageRepository;
 import com.wzabek.rentengine.protocol.repository.ProtocolRepository;
+import com.wzabek.rentengine.protocol.storage.PhotoStorage;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
 import com.wzabek.rentengine.user.repository.UserRepository;
@@ -15,7 +18,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -25,11 +30,14 @@ import java.time.temporal.ChronoUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Wydanie → zwrot → uszkodzenie MAJOR (R7) przez HTTP na prawdziwej bazie
+// Wydanie → zwrot → uszkodzenie MAJOR (R7) → zdjęcie, przez HTTP na prawdziwej bazie
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
@@ -49,9 +57,14 @@ class ProtocolIntegrationTest {
     private EquipmentUnitRepository unitRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private DamageRepository damageRepository;
+    @Autowired
+    private PhotoStorage photoStorage;
 
     @AfterEach
     void cleanUp() {
+        damageRepository.findAll().stream().map(Damage::getPhotoPath).forEach(photoStorage::delete);
         protocolRepository.deleteAll();
         agreementRepository.deleteAll();
         EquipmentUnit unit = unitRepository.findById(UNIT_ID).orElseThrow();
@@ -61,7 +74,7 @@ class ProtocolIntegrationTest {
     }
 
     @Test
-    void employeeIssuesAndReceivesUnitAndMajorDamageSendsItToService() throws Exception {
+    void employeeIssuesAndReceivesUnitAndRecordsMajorDamageWithPhoto() throws Exception {
         String employee = login("employee@rentengine.local", "Employee123!");
         String client = login("client@rentengine.local", "Client123!");
         // Umowa trwająca już od godziny; przez API nie da się zarezerwować wstecz
@@ -91,11 +104,32 @@ class ProtocolIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         Integer returnId = JsonPath.read(returned, "$.id");
 
-        mvc.perform(post("/api/protocols/{id}/damages", returnId).header(HttpHeaders.AUTHORIZATION, bearer(employee))
+        String damage = mvc.perform(post("/api/protocols/{id}/damages", returnId).header(HttpHeaders.AUTHORIZATION, bearer(employee))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"description\":\"Bent blade\",\"severity\":\"MAJOR\",\"cost\":1200.00}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.protocolId").value(returnId));
+                .andExpect(jsonPath("$.protocolId").value(returnId))
+                .andReturn().getResponse().getContentAsString();
+        Integer damageId = JsonPath.read(damage, "$.id");
+
+        byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3};
+        mvc.perform(multipart(HttpMethod.PUT, "/api/damages/{id}/photo", damageId)
+                        .file(new MockMultipartFile("photo", "fake.jpg", "image/jpeg", "not an image".getBytes()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.photo").value("must be a JPEG or PNG image"));
+        mvc.perform(multipart(HttpMethod.PUT, "/api/damages/{id}/photo", damageId)
+                        .file(new MockMultipartFile("photo", "blade.jpg", "image/jpeg", jpeg))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.photoUrl").value("/api/damages/" + damageId + "/photo"));
+        mvc.perform(get("/api/damages/{id}/photo", damageId).header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
+                .andExpect(content().bytes(jpeg));
+        mvc.perform(get("/api/damages/{id}/photo", damageId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(login("client2@rentengine.local", "Client123!"))))
+                .andExpect(status().isForbidden());
 
         mvc.perform(get("/api/rentals/{id}/protocols", id).header(HttpHeaders.AUTHORIZATION, bearer(client)))
                 .andExpect(status().isOk())

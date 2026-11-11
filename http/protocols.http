@@ -144,6 +144,40 @@ Content-Type: application/json
   "cost": 900.00
 }
 
+> {% client.global.set("damageId", response.body.id); %}
+
+### Zdjęcie uszkodzenia (JPEG/PNG do 5 MB) → 200 z photoUrl; kolejne zastępuje poprzednie
+PUT {{host}}/api/damages/{{damageId}}/photo
+Authorization: Bearer {{employeeToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="photo"; filename="sample-damage.png"
+Content-Type: image/png
+
+< ./sample-damage.png
+--boundary--
+
+### Plik, który nie jest obrazem → 400 (typ sprawdzany po zawartości, nie po nagłówku)
+PUT {{host}}/api/damages/{{damageId}}/photo
+Authorization: Bearer {{employeeToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="photo"; filename="fake.jpg"
+Content-Type: image/jpeg
+
+not an image
+--boundary--
+
+### Klient pobiera zdjęcie ze swojej umowy → 200 image/png
+GET {{host}}/api/damages/{{damageId}}/photo
+Authorization: Bearer {{clientToken}}
+
+### Inny klient → 403
+GET {{host}}/api/damages/{{damageId}}/photo
+Authorization: Bearer {{client2Token}}
+
 ### Egzemplarz 8 ma teraz status IN_SERVICE
 GET {{host}}/api/units/8
 

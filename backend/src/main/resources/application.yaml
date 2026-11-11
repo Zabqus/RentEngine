@@ -20,6 +20,10 @@ spring:
   web:
     locale: en
     locale-resolver: fixed
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 management:
   endpoints:
@@ -31,6 +35,9 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:PT24H}
+  # Zdjęcia uszkodzeń; względna ścieżka liczy się od katalogu uruchomienia (backend/)
+  uploads:
+    dir: ${UPLOADS_DIR:uploads}
 
 springdoc:
   swagger-ui:

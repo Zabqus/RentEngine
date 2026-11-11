@@ -9,6 +9,8 @@ public record DamageResponse(
         Long protocolId,
         String description,
         DamageSeverity severity,
-        BigDecimal cost
+        BigDecimal cost,
+        // null, gdy brak zdjęcia
+        String photoUrl
 ) {
 }

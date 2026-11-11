@@ -1,5 +1,6 @@
 package com.wzabek.rentengine.protocol.controller;
 
+import com.wzabek.rentengine.protocol.dto.DamagePhoto;
 import com.wzabek.rentengine.protocol.dto.DamageRequest;
 import com.wzabek.rentengine.protocol.dto.DamageResponse;
 import com.wzabek.rentengine.protocol.dto.ProtocolRequest;
@@ -9,11 +10,15 @@ import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -45,5 +50,23 @@ public class ProtocolController {
     public ResponseEntity<DamageResponse> addDamage(@PathVariable Long protocolId,
                                                     @Valid @RequestBody DamageRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(protocolService.addDamage(protocolId, request));
+    }
+
+    // JPEG/PNG do 5 MB; nowe zdjęcie zastępuje poprzednie
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PutMapping(path = "/damages/{damageId}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public DamageResponse uploadPhoto(@PathVariable Long damageId, @RequestPart("photo") MultipartFile photo) {
+        return protocolService.uploadPhoto(damageId, photo);
+    }
+
+    // Klient widzi zdjęcia ze swoich umów, pracownik i admin wszystkie
+    @GetMapping("/damages/{damageId}/photo")
+    public ResponseEntity<Resource> getPhoto(@PathVariable Long damageId,
+                                             @AuthenticationPrincipal AuthenticatedUser user) {
+        DamagePhoto photo = protocolService.loadPhoto(damageId, user);
+        return ResponseEntity.ok()
+                .contentType(photo.mediaType())
+                .cacheControl(CacheControl.noCache().cachePrivate())
+                .body(photo.resource());
     }
 }

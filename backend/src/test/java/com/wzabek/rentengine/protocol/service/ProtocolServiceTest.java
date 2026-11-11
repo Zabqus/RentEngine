@@ -6,16 +6,21 @@ import com.wzabek.rentengine.catalog.entity.Equipment;
 import com.wzabek.rentengine.catalog.entity.EquipmentUnit;
 import com.wzabek.rentengine.catalog.entity.UnitStatus;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
+import com.wzabek.rentengine.common.exception.ForbiddenOperationException;
 import com.wzabek.rentengine.common.exception.InvalidRequestException;
+import com.wzabek.rentengine.common.exception.NotFoundException;
 import com.wzabek.rentengine.protocol.dto.DamageRequest;
+import com.wzabek.rentengine.protocol.dto.DamageResponse;
 import com.wzabek.rentengine.protocol.dto.ProtocolRequest;
 import com.wzabek.rentengine.protocol.dto.ProtocolResponse;
+import com.wzabek.rentengine.protocol.entity.Damage;
 import com.wzabek.rentengine.protocol.entity.DamageSeverity;
 import com.wzabek.rentengine.protocol.entity.Protocol;
 import com.wzabek.rentengine.protocol.entity.ProtocolType;
 import com.wzabek.rentengine.protocol.mapper.ProtocolMapper;
 import com.wzabek.rentengine.protocol.repository.DamageRepository;
 import com.wzabek.rentengine.protocol.repository.ProtocolRepository;
+import com.wzabek.rentengine.protocol.storage.PhotoStorage;
 import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
@@ -24,11 +29,13 @@ import com.wzabek.rentengine.settlement.repository.SettlementRepository;
 import com.wzabek.rentengine.user.entity.Role;
 import com.wzabek.rentengine.user.entity.User;
 import com.wzabek.rentengine.user.repository.UserRepository;
+import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -40,8 +47,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.InstanceOfAssertFactories.MAP;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.MAP;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -71,6 +78,8 @@ class ProtocolServiceTest {
     private UserRepository userRepository;
     @Mock
     private RentalService rentalService;
+    @Mock
+    private PhotoStorage photoStorage;
 
     private Equipment equipment;
     private EquipmentUnit unit;
@@ -95,7 +104,7 @@ class ProtocolServiceTest {
     private ProtocolService serviceAt(LocalDateTime now) {
         Clock clock = Clock.fixed(now.atZone(ZONE).toInstant(), ZONE);
         return new ProtocolService(protocolRepository, damageRepository, agreementRepository, settlementRepository,
-                userRepository, rentalService, new ProtocolMapper(), clock);
+                userRepository, rentalService, new ProtocolMapper(), photoStorage, clock);
     }
 
     private void givenAgreementAndEmployee() {
@@ -260,5 +269,60 @@ class ProtocolServiceTest {
                 .isInstanceOf(BusinessRuleException.class)
                 .extracting("code").isEqualTo("AGREEMENT_SETTLED");
         verify(damageRepository, never()).save(any());
+    }
+
+    private Damage givenDamage(String photoPath) {
+        Protocol protocol = new Protocol(agreement, ProtocolType.RETURN, new BigDecimal("10.00"), 150, null, employee);
+        Damage damage = new Damage("Rysa", DamageSeverity.MINOR, new BigDecimal("200.00"));
+        protocol.addDamage(damage);
+        ReflectionTestUtils.setField(damage, "id", 20L);
+        damage.setPhotoPath(photoPath);
+        when(damageRepository.findById(20L)).thenReturn(Optional.of(damage));
+        return damage;
+    }
+
+    @Test
+    void uploadPhotoReplacesPreviousOne() {
+        Damage damage = givenDamage("damages/old.jpg");
+        MockMultipartFile file = new MockMultipartFile("photo", new byte[]{1});
+        when(photoStorage.save(file)).thenReturn("damages/new.jpg");
+
+        DamageResponse response = serviceAt(NOW).uploadPhoto(20L, file);
+
+        assertThat(damage.getPhotoPath()).isEqualTo("damages/new.jpg");
+        assertThat(response.photoUrl()).isEqualTo("/api/damages/20/photo");
+        verify(photoStorage).delete("damages/old.jpg");
+    }
+
+    @Test
+    void uploadPhotoAfterSettlementIsRejected() {
+        givenDamage(null);
+        when(settlementRepository.existsByAgreementId(AGREEMENT_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> serviceAt(NOW).uploadPhoto(20L, new MockMultipartFile("photo", new byte[]{1})))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("AGREEMENT_SETTLED");
+        verify(photoStorage, never()).save(any());
+    }
+
+    @Test
+    void photoOfForeignAgreementIsForbidden() {
+        givenDamage("damages/a.jpg");
+        AuthenticatedUser stranger = new AuthenticatedUser(99L, "x@test.pl", Role.CLIENT);
+        when(rentalService.getAccessibleAgreement(AGREEMENT_ID, stranger))
+                .thenThrow(new ForbiddenOperationException("nope"));
+
+        assertThatThrownBy(() -> serviceAt(NOW).loadPhoto(20L, stranger))
+                .isInstanceOf(ForbiddenOperationException.class);
+        verify(photoStorage, never()).load(any());
+    }
+
+    @Test
+    void missingPhotoReturnsNotFound() {
+        givenDamage(null);
+        AuthenticatedUser staff = new AuthenticatedUser(EMPLOYEE_ID, "emp@test.pl", Role.EMPLOYEE);
+
+        assertThatThrownBy(() -> serviceAt(NOW).loadPhoto(20L, staff))
+                .isInstanceOf(NotFoundException.class);
     }
 }
