@@ -1,0 +1,8 @@
+# Tylko w testach; Spring Boot łączy ten plik z głównym application.yaml (classpath:/config/ ma wyższy priorytet)
+app:
+  # Scheduler nie może zmieniać danych w trakcie testów; testy wołają RentalMaintenanceService bezpośrednio
+  scheduler:
+    enabled: false
+  # Bez prawdziwego SMTP; test maili włącza je sam i podmienia JavaMailSender na mocka
+  mail:
+    enabled: false

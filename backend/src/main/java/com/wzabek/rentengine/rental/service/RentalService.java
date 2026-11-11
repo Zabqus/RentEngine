@@ -15,6 +15,7 @@ import com.wzabek.rentengine.rental.dto.RentalRequest;
 import com.wzabek.rentengine.rental.dto.RentalResponse;
 import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
+import com.wzabek.rentengine.rental.event.ReservationCreatedEvent;
 import com.wzabek.rentengine.rental.mapper.RentalMapper;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
 import com.wzabek.rentengine.rental.repository.RentalSpecifications;
@@ -25,6 +26,7 @@ import com.wzabek.rentengine.user.entity.User;
 import com.wzabek.rentengine.user.repository.UserRepository;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +48,7 @@ public class RentalService {
     private final UserRepository userRepository;
     private final PricingCalculator pricingCalculator;
     private final RentalMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public RentalResponse findById(Long id, AuthenticatedUser user) {
         return mapper.toResponse(getAccessibleAgreement(id, user));
@@ -89,7 +92,9 @@ public class RentalService {
                 request.startDate(), request.endDate());
         RentalAgreement agreement = new RentalAgreement(client, unit, request.startDate(), request.endDate(),
                 basePrice, equipment.getDeposit());
-        return mapper.toResponse(agreementRepository.save(agreement));
+        RentalAgreement saved = agreementRepository.save(agreement);
+        eventPublisher.publishEvent(new ReservationCreatedEvent(saved.getId()));
+        return mapper.toResponse(saved);
     }
 
     // Klient anuluje tylko swoją umowę, admin każdą; R8 pilnuje, że tylko RESERVED

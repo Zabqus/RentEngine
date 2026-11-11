@@ -16,5 +16,13 @@ services:
       timeout: 5s
       retries: 10
 
+  # Testowy serwer SMTP: łapie wszystkie maile, podgląd w przeglądarce na http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: rentengine-mailpit
+    ports:
+      - "${MAIL_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
 volumes:
   postgres-data:

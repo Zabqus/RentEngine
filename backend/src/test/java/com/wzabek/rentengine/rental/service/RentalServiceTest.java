@@ -14,6 +14,7 @@ import com.wzabek.rentengine.rental.dto.RentalRequest;
 import com.wzabek.rentengine.rental.dto.RentalResponse;
 import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
+import com.wzabek.rentengine.rental.event.ReservationCreatedEvent;
 import com.wzabek.rentengine.rental.mapper.RentalMapper;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
 import com.wzabek.rentengine.settlement.pricing.PricingCalculator;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -41,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +64,8 @@ class RentalServiceTest {
     private SettlementRepository settlementRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private RentalService service;
     private User client;
@@ -69,7 +74,7 @@ class RentalServiceTest {
     @BeforeEach
     void setUp() {
         service = new RentalService(agreementRepository, unitRepository, settlementRepository, userRepository,
-                new PricingCalculator(), new RentalMapper());
+                new PricingCalculator(), new RentalMapper(), eventPublisher);
 
         client = new User("jan@test.pl", "hash", "Jan", "Kowalski", Role.CLIENT);
         ReflectionTestUtils.setField(client, "id", CLIENT_ID);
@@ -91,6 +96,7 @@ class RentalServiceTest {
         assertThat(saved.getValue().getStatus()).isEqualTo(AgreementStatus.RESERVED);
         assertThat(response.basePrice()).isEqualByComparingTo("1350.00"); // 49 h = 3 doby × 450
         assertThat(response.deposit()).isEqualByComparingTo("3000.00");
+        verify(eventPublisher).publishEvent(new ReservationCreatedEvent(saved.getValue().getId()));
     }
 
     @Test
@@ -102,6 +108,7 @@ class RentalServiceTest {
                 .isInstanceOf(BusinessRuleException.class)
                 .extracting("code").isEqualTo("UNIT_NOT_AVAILABLE");
         verify(agreementRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

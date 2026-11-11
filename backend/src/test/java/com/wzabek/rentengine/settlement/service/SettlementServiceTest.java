@@ -16,6 +16,7 @@ import com.wzabek.rentengine.rental.service.RentalService;
 import com.wzabek.rentengine.settlement.config.PricingProperties;
 import com.wzabek.rentengine.settlement.dto.SettlementResponse;
 import com.wzabek.rentengine.settlement.entity.Settlement;
+import com.wzabek.rentengine.settlement.event.SettlementCreatedEvent;
 import com.wzabek.rentengine.settlement.mapper.SettlementMapper;
 import com.wzabek.rentengine.settlement.pricing.PricingCalculator;
 import com.wzabek.rentengine.settlement.repository.SettlementRepository;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -62,6 +64,8 @@ class SettlementServiceTest {
     private DamageRepository damageRepository;
     @Mock
     private RentalService rentalService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private SettlementService service;
     private RentalAgreement agreement;
@@ -71,7 +75,8 @@ class SettlementServiceTest {
     void setUp() {
         Clock clock = Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
         service = new SettlementService(settlementRepository, protocolRepository, damageRepository, rentalService,
-                new PricingCalculator(), new PricingProperties(new BigDecimal("7.00")), new SettlementMapper(), clock);
+                new PricingCalculator(), new PricingProperties(new BigDecimal("7.00")), new SettlementMapper(),
+                eventPublisher, clock);
 
         Category category = new Category("Minikoparki", CategoryType.EXCAVATOR, List.of());
         Equipment equipment = new Equipment("Kubota U17-3", category, new BigDecimal("450.00"),
@@ -112,6 +117,7 @@ class SettlementServiceTest {
         assertThat(response.depositRefund()).isEqualByComparingTo("0.00");
         assertThat(response.total()).isEqualByComparingTo("1260.00");
         assertThat(response.paid()).isFalse();
+        verify(eventPublisher).publishEvent(any(SettlementCreatedEvent.class));
     }
 
     @Test

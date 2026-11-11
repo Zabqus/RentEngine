@@ -25,12 +25,22 @@ spring:
     web:
       pageable:
         max-page-size: 100
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+  task:
+    execution:
+      thread-name-prefix: async-
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
 
 management:
+  # Maile są wysyłane w tle i ich awaria nie może oznaczać całej aplikacji jako DOWN
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -42,6 +52,17 @@ app:
     expiration: ${JWT_EXPIRATION:PT24H}
   pricing:
     fuel-price: ${FUEL_PRICE:7.00}
+  mail:
+    from: ${MAIL_FROM:no-reply@rentengine.local}
+    # false = maile tylko w logu (np. w testach)
+    enabled: ${MAIL_ENABLED:true}
+  rental:
+    # Rezerwacja nieodebrana tyle czasu po starcie jest anulowana przez scheduler
+    pickup-grace: ${PICKUP_GRACE:PT24H}
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:true}
+    # Co 5 minut (sekunda minuta godzina dzień miesiąc dzień_tygodnia)
+    cron: "${SCHEDULER_CRON:0 */5 * * * *}"
   # Zdjęcia uszkodzeń; względna ścieżka liczy się od katalogu uruchomienia (backend/)
   uploads:
     dir: ${UPLOADS_DIR:uploads}

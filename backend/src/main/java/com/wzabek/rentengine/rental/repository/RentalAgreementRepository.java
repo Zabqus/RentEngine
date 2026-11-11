@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface RentalAgreementRepository extends JpaRepository<RentalAgreement, Long>, JpaSpecificationExecutor<RentalAgreement> {
@@ -28,6 +29,21 @@ public interface RentalAgreementRepository extends JpaRepository<RentalAgreement
     boolean existsByUnitIdAndStatusIn(Long unitId, Collection<AgreementStatus> statuses);
 
     boolean existsByUnitIdAndStatusInAndIdNot(Long unitId, Collection<AgreementStatus> statuses, Long id);
+
+    // Scheduler: aktywne umowy po terminie zwrotu
+    @Query("""
+            select a.id from RentalAgreement a
+            where a.status = com.wzabek.rentengine.rental.entity.AgreementStatus.ACTIVE and a.endDate < :now
+            """)
+    List<Long> findOverdueIds(LocalDateTime now);
+
+    // Scheduler: rezerwacje nieodebrane w czasie pickupDeadline albo takie, których okres już minął
+    @Query("""
+            select a.id from RentalAgreement a
+            where a.status = com.wzabek.rentengine.rental.entity.AgreementStatus.RESERVED
+              and (a.startDate < :pickupDeadline or a.endDate <= :now)
+            """)
+    List<Long> findUnclaimedIds(LocalDateTime pickupDeadline, LocalDateTime now);
 
     // R1: przedziały [start, end) nachodzą na siebie. OVERDUE blokuje bez końca, bo sprzęt jeszcze nie wrócił.
     @Query("""

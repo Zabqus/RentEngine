@@ -12,6 +12,7 @@ import com.wzabek.rentengine.rental.service.RentalService;
 import com.wzabek.rentengine.settlement.config.PricingProperties;
 import com.wzabek.rentengine.settlement.dto.SettlementResponse;
 import com.wzabek.rentengine.settlement.entity.Settlement;
+import com.wzabek.rentengine.settlement.event.SettlementCreatedEvent;
 import com.wzabek.rentengine.settlement.mapper.SettlementMapper;
 import com.wzabek.rentengine.settlement.pricing.PricingCalculator;
 import com.wzabek.rentengine.settlement.pricing.SettlementAmounts;
@@ -19,6 +20,7 @@ import com.wzabek.rentengine.settlement.pricing.SettlementInput;
 import com.wzabek.rentengine.settlement.repository.SettlementRepository;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class SettlementService {
     private final PricingCalculator pricingCalculator;
     private final PricingProperties pricingProperties;
     private final SettlementMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     // Rozliczenie liczymy raz, po zwrocie; potem kwoty są zamrożone (uszkodzeń nie da się już dodać)
@@ -70,6 +73,7 @@ public class SettlementService {
 
         Settlement settlement = settlementRepository.save(new Settlement(agreement, amounts.baseAmount(),
                 amounts.lateFee(), amounts.fuelFee(), amounts.damageFee(), amounts.depositDeduction(), amounts.total()));
+        eventPublisher.publishEvent(new SettlementCreatedEvent(settlement.getId()));
         return mapper.toResponse(settlement, amounts.lateDays());
     }
 
