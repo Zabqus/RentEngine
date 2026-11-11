@@ -4,16 +4,20 @@ import com.wzabek.rentengine.catalog.entity.Equipment;
 import com.wzabek.rentengine.catalog.entity.EquipmentUnit;
 import com.wzabek.rentengine.catalog.entity.UnitStatus;
 import com.wzabek.rentengine.catalog.repository.EquipmentUnitRepository;
+import com.wzabek.rentengine.common.dto.PageResponse;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
 import com.wzabek.rentengine.common.exception.ForbiddenOperationException;
 import com.wzabek.rentengine.common.exception.InvalidRequestException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
+import com.wzabek.rentengine.common.web.Pageables;
+import com.wzabek.rentengine.rental.dto.RentalFilter;
 import com.wzabek.rentengine.rental.dto.RentalRequest;
 import com.wzabek.rentengine.rental.dto.RentalResponse;
 import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
 import com.wzabek.rentengine.rental.mapper.RentalMapper;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
+import com.wzabek.rentengine.rental.repository.RentalSpecifications;
 import com.wzabek.rentengine.settlement.pricing.PricingCalculator;
 import com.wzabek.rentengine.settlement.repository.SettlementRepository;
 import com.wzabek.rentengine.user.entity.Role;
@@ -21,6 +25,7 @@ import com.wzabek.rentengine.user.entity.User;
 import com.wzabek.rentengine.user.repository.UserRepository;
 import com.wzabek.rentengine.user.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +38,8 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class RentalService {
 
+    private static final List<String> SORTABLE = List.of("startDate", "endDate", "createdAt", "id");
+
     private final RentalAgreementRepository agreementRepository;
     private final EquipmentUnitRepository unitRepository;
     private final SettlementRepository settlementRepository;
@@ -44,18 +51,10 @@ public class RentalService {
         return mapper.toResponse(getAccessibleAgreement(id, user));
     }
 
-    // Lista dla personelu; paginacja dojdzie w Dniu 7
-    public List<RentalResponse> findAll(AgreementStatus status) {
-        List<RentalAgreement> agreements = status == null
-                ? agreementRepository.findAllByOrderByStartDateAsc()
-                : agreementRepository.findByStatusOrderByStartDateAsc(status);
-        return agreements.stream().map(mapper::toResponse).toList();
-    }
-
-    public List<RentalResponse> findByClient(Long clientId) {
-        return agreementRepository.findByClientIdOrderByStartDateDesc(clientId).stream()
-                .map(mapper::toResponse)
-                .toList();
+    // Personel: wszystkie umowy z filtrami; klient: ten sam mechanizm z clientId z tokena
+    public PageResponse<RentalResponse> findAll(RentalFilter filter, Pageable pageable) {
+        return PageResponse.from(agreementRepository.findAll(RentalSpecifications.matching(filter),
+                Pageables.withAllowedSort(pageable, SORTABLE)), mapper::toResponse);
     }
 
     @Transactional

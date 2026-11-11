@@ -11,9 +11,13 @@ import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -76,7 +80,49 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.detail").value("Unexpected server error"));
     }
 
+    @Test
+    void wrongEnumInQueryListsAllowedValues() throws Exception {
+        mvc.perform(get("/test/params").param("color", "PINK"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.color").value("must be one of [RED, GREEN]"));
+    }
+
+    @Test
+    void wrongNumberInPathIsReadable() throws Exception {
+        mvc.perform(get("/test/items/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.id").value("must be a number"));
+    }
+
+    @Test
+    void wrongEnumInBodyPointsToField() throws Exception {
+        mvc.perform(post("/test/paint").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"color\": \"PINK\", \"when\": \"2030-01-01T10:00\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.color").value("must be one of [RED, GREEN]"));
+    }
+
+    @Test
+    void wrongDateInBodyIsReadable() throws Exception {
+        mvc.perform(post("/test/paint").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"color\": \"RED\", \"when\": \"tomorrow\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.when").value("must be a date-time in format yyyy-MM-ddTHH:mm"));
+    }
+
+    @Test
+    void malformedJsonReturns400WithoutInternals() throws Exception {
+        mvc.perform(post("/test/paint").contentType(MediaType.APPLICATION_JSON).content("{\"color\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Request body is missing or is not valid JSON"));
+    }
+
     record Body(@NotBlank String name) {
+    }
+
+    enum Color { RED, GREEN }
+
+    record Paint(Color color, LocalDateTime when) {
     }
 
     @RestController
@@ -104,6 +150,18 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/test/valid")
         void valid(@Valid @RequestBody Body body) {
+        }
+
+        @GetMapping("/test/params")
+        void params(@RequestParam Color color) {
+        }
+
+        @GetMapping("/test/items/{id}")
+        void item(@PathVariable Long id) {
+        }
+
+        @PostMapping("/test/paint")
+        void paint(@RequestBody Paint paint) {
         }
 
         @GetMapping("/test/boom")

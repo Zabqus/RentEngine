@@ -91,7 +91,7 @@ class RentalLifecycleIntegrationTest {
 
         mvc.perform(get("/api/rentals").param("status", "RESERVED").header(HttpHeaders.AUTHORIZATION, bearer(employee)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)));
+                .andExpect(jsonPath("$.content", hasSize(1)));
         mvc.perform(post("/api/rentals/{id}/protocols", id).header(HttpHeaders.AUTHORIZATION, bearer(client))
                         .contentType(MediaType.APPLICATION_JSON).content(protocolJson("ISSUE", "8.50", 210)))
                 .andExpect(status().isForbidden());

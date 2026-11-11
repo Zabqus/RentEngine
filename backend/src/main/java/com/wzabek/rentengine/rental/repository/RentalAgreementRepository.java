@@ -2,6 +2,9 @@ package com.wzabek.rentengine.rental.repository;
 
 import com.wzabek.rentengine.rental.entity.AgreementStatus;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -9,7 +12,6 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 public interface RentalAgreementRepository extends JpaRepository<RentalAgreement, Long>, JpaSpecificationExecutor<RentalAgreement> {
@@ -18,14 +20,10 @@ public interface RentalAgreementRepository extends JpaRepository<RentalAgreement
 
     boolean existsByClientId(Long clientId);
 
+    // Klient i egzemplarz w jednym zapytaniu, bez N+1 przy mapowaniu strony
+    @Override
     @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
-    List<RentalAgreement> findByClientIdOrderByStartDateDesc(Long clientId);
-
-    @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
-    List<RentalAgreement> findAllByOrderByStartDateAsc();
-
-    @EntityGraph(attributePaths = {"client", "unit", "unit.equipment"})
-    List<RentalAgreement> findByStatusOrderByStartDateAsc(AgreementStatus status);
+    Page<RentalAgreement> findAll(Specification<RentalAgreement> spec, Pageable pageable);
 
     boolean existsByUnitIdAndStatusIn(Long unitId, Collection<AgreementStatus> statuses);
 

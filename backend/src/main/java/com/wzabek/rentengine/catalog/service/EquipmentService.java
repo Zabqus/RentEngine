@@ -13,10 +13,9 @@ import com.wzabek.rentengine.common.dto.PageResponse;
 import com.wzabek.rentengine.common.exception.BusinessRuleException;
 import com.wzabek.rentengine.common.exception.InvalidRequestException;
 import com.wzabek.rentengine.common.exception.NotFoundException;
+import com.wzabek.rentengine.common.web.Pageables;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +37,9 @@ public class EquipmentService {
     private final EquipmentMapper mapper;
 
     public PageResponse<EquipmentResponse> findAll(EquipmentFilter filter, Pageable pageable) {
-        validateFilter(filter, pageable.getSort());
-        // Dosortowanie po id, żeby kolejność między stronami była stabilna przy równych nazwach/cenach
-        Pageable stable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
-                pageable.getSort().and(Sort.by("id")));
-        return PageResponse.from(equipmentRepository.findAll(EquipmentSpecifications.matching(filter), stable),
-                mapper::toResponse);
+        validateFilter(filter);
+        return PageResponse.from(equipmentRepository.findAll(EquipmentSpecifications.matching(filter),
+                Pageables.withAllowedSort(pageable, SORTABLE)), mapper::toResponse);
     }
 
     public EquipmentResponse findById(Long id) {
@@ -91,7 +87,7 @@ public class EquipmentService {
                 .orElseThrow(() -> new NotFoundException("Equipment", id));
     }
 
-    private static void validateFilter(EquipmentFilter filter, Sort sort) {
+    private static void validateFilter(EquipmentFilter filter) {
         Map<String, String> errors = new LinkedHashMap<>();
         if (filter.minPrice() != null && filter.maxPrice() != null && filter.minPrice().compareTo(filter.maxPrice()) > 0) {
             errors.put("maxPrice", "must be greater than or equal to minPrice");
@@ -101,9 +97,6 @@ public class EquipmentService {
         } else if (filter.from() != null && !filter.to().isAfter(filter.from())) {
             errors.put("to", "must be after from");
         }
-        // Nieznane pole sortowania skończyłoby się błędem 500 w zapytaniu
-        sort.stream().filter(order -> !SORTABLE.contains(order.getProperty())).findFirst().ifPresent(order ->
-                errors.put("sort", "unsupported property '%s', allowed: %s".formatted(order.getProperty(), SORTABLE)));
         if (!errors.isEmpty()) {
             throw new InvalidRequestException(errors);
         }

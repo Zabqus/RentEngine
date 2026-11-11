@@ -83,7 +83,7 @@ class ApiSecurityIntegrationTest {
         Integer id = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
 
         mvc.perform(get("/api/rentals/my").header(HttpHeaders.AUTHORIZATION, bearer(jan)))
-                .andExpect(jsonPath("$", hasSize(1)));
+                .andExpect(jsonPath("$.content", hasSize(1)));
         mvc.perform(get("/api/rentals/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(anna)))
                 .andExpect(status().isForbidden());
         // R1 przez HTTP: ten sam egzemplarz w tym samym terminie
@@ -91,6 +91,56 @@ class ApiSecurityIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(rentalJson(3, 10)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("UNIT_NOT_AVAILABLE"));
+    }
+
+    @Test
+    void invalidRequestsReturn400WithFieldErrors() throws Exception {
+        String jan = login("client@rentengine.local", "Client123!");
+        String employee = login("employee@rentengine.local", "Employee123!");
+        String admin = login("admin@rentengine.local", "Admin123!");
+
+        mvc.perform(post("/api/rentals").header(HttpHeaders.AUTHORIZATION, bearer(jan))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"startDate\":\"2020-01-01T10:00\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.unitId").value("must not be null"))
+                .andExpect(jsonPath("$.errors.startDate").value("must be a future date"))
+                .andExpect(jsonPath("$.errors.endDate").value("must not be null"));
+        mvc.perform(get("/api/rentals").param("status", "LOST").header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.status", startsWith("must be one of [RESERVED")));
+        mvc.perform(post("/api/users").header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"boss@test.pl\",\"password\":\"Secret123!\",\"firstName\":\"A\",\"lastName\":\"B\",\"role\":\"BOSS\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.role").value("must be one of [CLIENT, EMPLOYEE, ADMIN]"));
+        mvc.perform(get("/api/equipment").param("minPrice", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.minPrice").value("must be a number"));
+    }
+
+    @Test
+    void staffPagesAndFiltersRentals() throws Exception {
+        String jan = login("client@rentengine.local", "Client123!");
+        String employee = login("employee@rentengine.local", "Employee123!");
+        for (int days : new int[]{10, 20}) {
+            mvc.perform(post("/api/rentals").header(HttpHeaders.AUTHORIZATION, bearer(jan))
+                            .contentType(MediaType.APPLICATION_JSON).content(rentalJson(3, days)))
+                    .andExpect(status().isCreated());
+        }
+
+        String later = LocalDateTime.now().plusDays(20).truncatedTo(ChronoUnit.HOURS).toString();
+        mvc.perform(get("/api/rentals").param("size", "1").param("sort", "startDate,desc")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].startDate", startsWith(later)));
+        mvc.perform(get("/api/rentals").param("clientId", "2").header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/api/rentals").param("sort", "client.passwordHash").header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.sort").exists());
     }
 
     @Test

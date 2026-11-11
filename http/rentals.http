@@ -14,9 +14,25 @@ Content-Type: application/json
 
 > {% client.global.set("rentalId", response.body.id); %}
 
-### Moje umowy (Jan)
+### Moje umowy (Jan): strona, domyślnie od najnowszego startu; opcjonalnie ?status=
 GET {{host}}/api/rentals/my
 Authorization: Bearer {{clientToken}}
+
+### Wszystkie umowy (pracownik/admin): filtry status, clientId, unitId + page/size/sort
+GET {{host}}/api/rentals?status=RESERVED&clientId=1&page=0&size=10&sort=startDate,desc
+Authorization: Bearer {{employeeToken}}
+
+### Klient nie widzi wszystkich umów → 403
+GET {{host}}/api/rentals
+Authorization: Bearer {{clientToken}}
+
+### Zły status w filtrze → 400 z listą dozwolonych wartości
+GET {{host}}/api/rentals?status=LOST
+Authorization: Bearer {{employeeToken}}
+
+### Niedozwolone pole sortowania → 400
+GET {{host}}/api/rentals?sort=client.passwordHash
+Authorization: Bearer {{employeeToken}}
 
 ### Szczegóły umowy (właściciel)
 GET {{host}}/api/rentals/{{rentalId}}
