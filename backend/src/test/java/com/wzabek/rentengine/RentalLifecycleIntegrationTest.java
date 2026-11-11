@@ -10,6 +10,7 @@ import com.wzabek.rentengine.protocol.repository.ProtocolRepository;
 import com.wzabek.rentengine.protocol.storage.PhotoStorage;
 import com.wzabek.rentengine.rental.entity.RentalAgreement;
 import com.wzabek.rentengine.rental.repository.RentalAgreementRepository;
+import com.wzabek.rentengine.settlement.repository.SettlementRepository;
 import com.wzabek.rentengine.user.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -31,17 +32,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Wydanie → zwrot → uszkodzenie MAJOR (R7) → zdjęcie, przez HTTP na prawdziwej bazie
+// Pełny cykl umowy przez HTTP na prawdziwej bazie: wydanie → zwrot → szkoda MAJOR (R7) ze zdjęciem → rozliczenie (R3–R5) → blokada R6 → opłata
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
-class ProtocolIntegrationTest {
+class RentalLifecycleIntegrationTest {
 
     // HUS-TC242-0001 z seeda: zbiornik 8.50 l, 210 motogodzin
     private static final long UNIT_ID = 7;
@@ -61,10 +63,13 @@ class ProtocolIntegrationTest {
     private DamageRepository damageRepository;
     @Autowired
     private PhotoStorage photoStorage;
+    @Autowired
+    private SettlementRepository settlementRepository;
 
     @AfterEach
     void cleanUp() {
         damageRepository.findAll().stream().map(Damage::getPhotoPath).forEach(photoStorage::delete);
+        settlementRepository.deleteAll();
         protocolRepository.deleteAll();
         agreementRepository.deleteAll();
         EquipmentUnit unit = unitRepository.findById(UNIT_ID).orElseThrow();
@@ -74,7 +79,7 @@ class ProtocolIntegrationTest {
     }
 
     @Test
-    void employeeIssuesAndReceivesUnitAndRecordsMajorDamageWithPhoto() throws Exception {
+    void agreementGoesThroughWholeLifecycle() throws Exception {
         String employee = login("employee@rentengine.local", "Employee123!");
         String client = login("client@rentengine.local", "Client123!");
         // Umowa trwająca już od godziny; przez API nie da się zarezerwować wstecz
@@ -139,6 +144,41 @@ class ProtocolIntegrationTest {
         assertThat(unit.getStatus()).isEqualTo(UnitStatus.IN_SERVICE);
         assertThat(unit.getMileageOrHours()).isEqualTo(225);
         assertThat(agreementRepository.findById(id).orElseThrow().getStatus().name()).isEqualTo("RETURNED");
+
+        // Zwrot na czas; brak 5.50 l × 7 zł = 38.50; szkody 1200 - kaucja 800 = 400 → 320 + 38.50 + 400
+        String settlement = mvc.perform(post("/api/rentals/{id}/settlement", id).header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.lateFee").value(0.0))
+                .andExpect(jsonPath("$.fuelFee").value(38.5))
+                .andExpect(jsonPath("$.depositDeduction").value(800.0))
+                .andExpect(jsonPath("$.damageFee").value(400.0))
+                .andExpect(jsonPath("$.total").value(758.5))
+                .andReturn().getResponse().getContentAsString();
+        Integer settlementId = JsonPath.read(settlement, "$.id");
+
+        mvc.perform(post("/api/rentals").header(HttpHeaders.AUTHORIZATION, bearer(client))
+                        .contentType(MediaType.APPLICATION_JSON).content(rentalJson(3, 10)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("UNPAID_SETTLEMENT"));
+        mvc.perform(post("/api/protocols/{id}/damages", returnId).header(HttpHeaders.AUTHORIZATION, bearer(employee))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"Late find\",\"severity\":\"MINOR\",\"cost\":10}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("AGREEMENT_SETTLED"));
+        mvc.perform(patch("/api/settlements/{id}/pay", settlementId).header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(patch("/api/settlements/{id}/pay", settlementId).header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paid").value(true));
+        mvc.perform(get("/api/rentals/{id}/settlement", id).header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depositRefund").value(0.0));
+        mvc.perform(get("/api/rentals/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                .andExpect(jsonPath("$.status").value("SETTLED"));
+        mvc.perform(post("/api/rentals").header(HttpHeaders.AUTHORIZATION, bearer(client))
+                        .contentType(MediaType.APPLICATION_JSON).content(rentalJson(3, 10)))
+                .andExpect(status().isCreated());
     }
 
     private String login(String email, String password) throws Exception {
@@ -151,6 +191,11 @@ class ProtocolIntegrationTest {
 
     private static String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    private static String rentalJson(long unitId, int daysFromNow) {
+        LocalDateTime start = LocalDateTime.now().plusDays(daysFromNow).truncatedTo(ChronoUnit.HOURS);
+        return "{\"unitId\":%d,\"startDate\":\"%s\",\"endDate\":\"%s\"}".formatted(unitId, start, start.plusDays(2));
     }
 
     private static String protocolJson(String type, String fuel, int hours) {

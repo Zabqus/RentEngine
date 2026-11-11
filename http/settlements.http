@@ -1,0 +1,132 @@
+# Rozliczenie umowy (R3 kara, R4 paliwo, R5 szkody z kaucji) i opłacenie. Najpierw logowania w auth.http.
+# Egzemplarz 9 (JD-X350-0001): 240 zł/doba, kaucja 1200 zł, zbiornik 9.50 l. Cena paliwa z app.pricing.fuel-price (7.00).
+# Spóźnienia nie da się zrobić przez API (rezerwacja musi być w przyszłości), sprawdzają je testy PricingCalculatorTest.
+
+### Aktualny licznik egzemplarza 9
+GET {{host}}/api/units/9
+
+> {%
+    client.global.set("issueHours", response.body.mileageOrHours);
+    client.global.set("returnHours", response.body.mileageOrHours + 12);
+%}
+
+### Rezerwacja Jana od za 2 minut na 2 doby → 201 (480 zł)
+< {%
+    const fmt = d => {
+        const p = n => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    };
+    const start = new Date(Date.now() + 2 * 60 * 1000);
+    request.variables.set("start", fmt(start));
+    request.variables.set("end", fmt(new Date(start.getTime() + 2 * 24 * 60 * 60 * 1000)));
+%}
+POST {{host}}/api/rentals
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "unitId": 9,
+  "startDate": "{{start}}",
+  "endDate": "{{end}}"
+}
+
+> {% client.global.set("rentalId", response.body.id); %}
+
+### Rozliczenie przed zwrotem → 409 AGREEMENT_NOT_RETURNED
+POST {{host}}/api/rentals/{{rentalId}}/settlement
+Authorization: Bearer {{employeeToken}}
+
+### Wydanie z pełnym bakiem
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "type": "ISSUE",
+  "fuelLevel": 9.50,
+  "mileageOrHours": {{issueHours}}
+}
+
+### Zwrot z 3.50 l (brakuje 6 l)
+POST {{host}}/api/rentals/{{rentalId}}/protocols
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "type": "RETURN",
+  "fuelLevel": 3.50,
+  "mileageOrHours": {{returnHours}}
+}
+
+> {% client.global.set("returnId", response.body.id); %}
+
+### Uszkodzenie przy zwrocie za 1500 zł (więcej niż kaucja 1200)
+POST {{host}}/api/protocols/{{returnId}}/damages
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "description": "Cracked mower deck",
+  "severity": "MINOR",
+  "cost": 1500.00
+}
+
+### Klient nie generuje rozliczenia → 403
+POST {{host}}/api/rentals/{{rentalId}}/settlement
+Authorization: Bearer {{clientToken}}
+
+### Rozliczenie → 201: baza 480 + paliwo 6 × 7 = 42 + nadwyżka szkód 300 = 822; kaucja w całości potrącona
+POST {{host}}/api/rentals/{{rentalId}}/settlement
+Authorization: Bearer {{employeeToken}}
+
+> {% client.global.set("settlementId", response.body.id); %}
+
+### Drugie rozliczenie → 409 SETTLEMENT_EXISTS
+POST {{host}}/api/rentals/{{rentalId}}/settlement
+Authorization: Bearer {{employeeToken}}
+
+### Klient widzi swoje rozliczenie
+GET {{host}}/api/rentals/{{rentalId}}/settlement
+Authorization: Bearer {{clientToken}}
+
+### Inny klient → 403
+GET {{host}}/api/rentals/{{rentalId}}/settlement
+Authorization: Bearer {{client2Token}}
+
+### Po rozliczeniu nie można dopisać szkody → 409 AGREEMENT_SETTLED
+POST {{host}}/api/protocols/{{returnId}}/damages
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "description": "Late find",
+  "severity": "MINOR",
+  "cost": 10.00
+}
+
+### R6: nieopłacone rozliczenie blokuje nową rezerwację → 409 UNPAID_SETTLEMENT
+POST {{host}}/api/rentals
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "unitId": 4,
+  "startDate": "2027-03-01T10:00",
+  "endDate": "2027-03-02T10:00"
+}
+
+### Klient nie oznacza opłaty → 403
+PATCH {{host}}/api/settlements/{{settlementId}}/pay
+Authorization: Bearer {{clientToken}}
+
+### Opłacenie (pracownik albo admin) → 200, umowa SETTLED
+PATCH {{host}}/api/settlements/{{settlementId}}/pay
+Authorization: Bearer {{employeeToken}}
+
+### Ponowne opłacenie → 409 SETTLEMENT_ALREADY_PAID
+PATCH {{host}}/api/settlements/{{settlementId}}/pay
+Authorization: Bearer {{adminToken}}
+
+### Umowa ma status SETTLED
+GET {{host}}/api/rentals/{{rentalId}}
+Authorization: Bearer {{clientToken}}

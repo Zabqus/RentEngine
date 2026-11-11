@@ -65,4 +65,9 @@ public class Settlement {
         this.depositDeduction = depositDeduction;
         this.total = total;
     }
+
+    public void markPaid(LocalDateTime when) {
+        this.paid = true;
+        this.paidAt = when;
+    }
 }

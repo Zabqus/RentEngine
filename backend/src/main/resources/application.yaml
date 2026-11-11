@@ -35,6 +35,8 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:PT24H}
+  pricing:
+    fuel-price: ${FUEL_PRICE:7.00}
   # Zdjęcia uszkodzeń; względna ścieżka liczy się od katalogu uruchomienia (backend/)
   uploads:
     dir: ${UPLOADS_DIR:uploads}

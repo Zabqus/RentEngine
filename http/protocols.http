@@ -147,15 +147,16 @@ Content-Type: application/json
 > {% client.global.set("damageId", response.body.id); %}
 
 ### Zdjęcie uszkodzenia (JPEG/PNG do 5 MB) → 200 z photoUrl; kolejne zastępuje poprzednie
+# Podmień ścieżkę w "< ..." na dowolne zdjęcie z dysku (nie trzymamy zdjęć w repo)
 PUT {{host}}/api/damages/{{damageId}}/photo
 Authorization: Bearer {{employeeToken}}
 Content-Type: multipart/form-data; boundary=boundary
 
 --boundary
-Content-Disposition: form-data; name="photo"; filename="sample-damage.png"
-Content-Type: image/png
+Content-Disposition: form-data; name="photo"; filename="damage.jpg"
+Content-Type: image/jpeg
 
-< ./sample-damage.png
+< C:/path/to/damage.jpg
 --boundary--
 
 ### Plik, który nie jest obrazem → 400 (typ sprawdzany po zawartości, nie po nagłówku)
@@ -170,7 +171,7 @@ Content-Type: image/jpeg
 not an image
 --boundary--
 
-### Klient pobiera zdjęcie ze swojej umowy → 200 image/png
+### Klient pobiera zdjęcie ze swojej umowy → 200 z obrazem
 GET {{host}}/api/damages/{{damageId}}/photo
 Authorization: Bearer {{clientToken}}
 
