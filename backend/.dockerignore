@@ -1,0 +1,10 @@
+target/
+uploads/
+.idea/
+*.iml
+.env
+*.env
+plan.md
+HELP.md
+Dockerfile
+.dockerignore
