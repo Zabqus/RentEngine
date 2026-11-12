@@ -24,5 +24,41 @@ services:
       - "${MAIL_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
+  # Do pracy z IntelliJ wystarczy: docker compose up -d postgres mailpit
+  backend:
+    build: ./backend
+    image: rentengine-backend
+    container_name: rentengine-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    # Wewnątrz sieci compose: nazwy serwisów i porty kontenerów, nie hosta
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-PT24H}
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_FROM: ${MAIL_FROM:-no-reply@rentengine.local}
+      FUEL_PRICE: ${FUEL_PRICE:-7.00}
+      UPLOADS_DIR: /app/uploads
+      # Clock bierze strefę systemu, a daty umów są bez strefy
+      TZ: ${TZ:-Europe/Warsaw}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
 volumes:
   postgres-data:
+  uploads:
