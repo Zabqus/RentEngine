@@ -9,6 +9,8 @@ import { LoginPage } from './pages/LoginPage'
 import { MyRentalsPage } from './pages/MyRentalsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { RentalDetailsPage } from './pages/RentalDetailsPage'
+import { RentalsPage } from './pages/RentalsPage'
 
 export default function App() {
   return (
@@ -19,7 +21,6 @@ export default function App() {
         <Route path="catalog/:id" element={<EquipmentDetailsPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
-        {/* Strony ról dojdą w Dniu 10 */}
         <Route
           path="my-rentals"
           element={
@@ -32,7 +33,15 @@ export default function App() {
           path="rentals"
           element={
             <RequireAuth roles={['EMPLOYEE', 'ADMIN']}>
-              <ComingSoonPage title="Umowy" />
+              <RentalsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="rentals/:id"
+          element={
+            <RequireAuth roles={['EMPLOYEE', 'ADMIN']}>
+              <RentalDetailsPage />
             </RequireAuth>
           }
         />

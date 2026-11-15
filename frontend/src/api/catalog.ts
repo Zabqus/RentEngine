@@ -70,6 +70,11 @@ export async function getEquipment(id: number): Promise<Equipment> {
   return data
 }
 
+export async function getUnit(id: number): Promise<Unit> {
+  const { data } = await api.get<Unit>(`/units/${id}`)
+  return data
+}
+
 export async function getUnits(equipmentId: number): Promise<Unit[]> {
   const { data } = await api.get<Unit[]>('/units', { params: { equipmentId } })
   return data

@@ -47,6 +47,7 @@ const STATUS_MESSAGES: Record<number, string> = {
   401: 'Nieprawidłowy e-mail lub hasło.',
   403: 'Nie masz uprawnień do tej operacji.',
   404: 'Nie znaleziono zasobu.',
+  413: 'Plik jest za duży (maks. 5 MB).',
   409: 'Ktoś właśnie zmienił te dane. Odśwież i spróbuj ponownie.',
 }
 
@@ -60,6 +61,10 @@ const FIELD_MESSAGES: [RegExp, string][] = [
   [/^must be greater than or equal to 0$/, 'Wartość nie może być ujemna.'],
   [/^size must be between (\d+) and (\d+)$/, 'Długość musi mieć od $1 do $2 znaków.'],
   [/^must be a number$/, 'Podaj liczbę.'],
+  [/^must not exceed tank capacity \((.+) l\)$/, 'Nie może przekraczać pojemności zbiornika ($1 l).'],
+  [/^must not be less than current unit reading \((\d+)\)$/, 'Nie może być mniejszy niż obecny stan licznika ($1).'],
+  [/^must be empty, equipment has no fuel tank$/, 'Ten sprzęt nie ma zbiornika paliwa.'],
+  [/^must be a JPEG or PNG image$/, 'Plik musi być obrazem JPEG lub PNG.'],
 ]
 
 export function translateFieldMessage(message: string): string {
