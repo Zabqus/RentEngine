@@ -6,6 +6,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage'
 import { EquipmentDetailsPage } from './pages/EquipmentDetailsPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
+import { MyRentalsPage } from './pages/MyRentalsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { RegisterPage } from './pages/RegisterPage'
 
@@ -23,7 +24,7 @@ export default function App() {
           path="my-rentals"
           element={
             <RequireAuth roles={['CLIENT']}>
-              <ComingSoonPage title="Moje umowy" />
+              <MyRentalsPage />
             </RequireAuth>
           }
         />

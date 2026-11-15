@@ -19,6 +19,7 @@ import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-r
 import { getEquipment, getUnits } from '../api/catalog'
 import { getApiError } from '../api/errors'
 import { useAuth } from '../auth/useAuth'
+import { ReservationForm } from '../components/ReservationForm'
 import { counterLabel, formatMoney, formatNumber, formatParam, paramLabel } from '../utils/format'
 
 export function EquipmentDetailsPage() {
@@ -114,7 +115,10 @@ export function EquipmentDetailsPage() {
                 Zaloguj się, aby zarezerwować
               </Button>
             )}
-            {role === 'CLIENT' && <Alert severity="info">Rezerwacja online będzie dostępna wkrótce.</Alert>}
+            {role === 'CLIENT' && units.data && <ReservationForm equipment={item} units={units.data} />}
+            {role && role !== 'CLIENT' && (
+              <Alert severity="info">Rezerwacje składają klienci ze swojego konta.</Alert>
+            )}
           </CardContent>
         </Card>
       </Stack>

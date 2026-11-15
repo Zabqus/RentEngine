@@ -11,6 +11,25 @@ export function formatNumber(value: number): string {
   return number.format(value)
 }
 
+const dateTime = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
+
+// Daty z API są bez strefy (LocalDateTime), więc czytamy je jako czas lokalny
+export function formatDateTime(value: string): string {
+  return dateTime.format(new Date(value))
+}
+
+// Wartość dla <input type="datetime-local">: YYYY-MM-DDTHH:mm
+export function toInputDateTime(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// Jak PricingCalculator: każda rozpoczęta doba liczy się w całości
+export function rentalDays(start: string, end: string): number {
+  const ms = new Date(end).getTime() - new Date(start).getTime()
+  return ms > 0 ? Math.ceil(ms / (24 * 60 * 60 * 1000)) : 0
+}
+
 // Nazwy parametrów sprzętu z JSONB (klucze jak w backendzie)
 const PARAM_LABELS: Record<string, string> = {
   powerKw: 'Moc (kW)',
