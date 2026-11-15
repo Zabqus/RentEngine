@@ -36,6 +36,9 @@ export function Layout() {
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
+            <Button color="inherit" component={RouterLink} to="/catalog">
+              Katalog
+            </Button>
             {role &&
               NAV_LINKS[role].map((link) => (
                 <Button key={link.to} color="inherit" component={RouterLink} to={link.to}>
