@@ -79,3 +79,53 @@ export async function getUnits(equipmentId: number): Promise<Unit[]> {
   const { data } = await api.get<Unit[]>('/units', { params: { equipmentId } })
   return data
 }
+
+// --- Zarządzanie katalogiem (ADMIN; zmiana statusu egzemplarza także EMPLOYEE) ---
+
+export interface EquipmentRequest {
+  name: string
+  categoryId: number
+  dailyPrice: number
+  deposit: number
+  tankCapacity: number | null
+  params: Record<string, string | number | boolean>
+}
+
+export interface UnitRequest {
+  equipmentId: number
+  serialOrPlate: string
+  mileageOrHours: number
+}
+
+export async function createEquipment(request: EquipmentRequest): Promise<Equipment> {
+  const { data } = await api.post<Equipment>('/equipment', request)
+  return data
+}
+
+export async function updateEquipment(id: number, request: EquipmentRequest): Promise<Equipment> {
+  const { data } = await api.put<Equipment>(`/equipment/${id}`, request)
+  return data
+}
+
+export async function deleteEquipment(id: number): Promise<void> {
+  await api.delete(`/equipment/${id}`)
+}
+
+export async function createUnit(request: UnitRequest): Promise<Unit> {
+  const { data } = await api.post<Unit>('/units', request)
+  return data
+}
+
+export async function updateUnit(id: number, request: UnitRequest): Promise<Unit> {
+  const { data } = await api.put<Unit>(`/units/${id}`, request)
+  return data
+}
+
+export async function changeUnitStatus(id: number, status: UnitStatus): Promise<Unit> {
+  const { data } = await api.patch<Unit>(`/units/${id}/status`, { status })
+  return data
+}
+
+export async function deleteUnit(id: number): Promise<void> {
+  await api.delete(`/units/${id}`)
+}

@@ -65,6 +65,8 @@ const FIELD_MESSAGES: [RegExp, string][] = [
   [/^must not be less than current unit reading \((\d+)\)$/, 'Nie może być mniejszy niż obecny stan licznika ($1).'],
   [/^must be empty, equipment has no fuel tank$/, 'Ten sprzęt nie ma zbiornika paliwa.'],
   [/^must be a JPEG or PNG image$/, 'Plik musi być obrazem JPEG lub PNG.'],
+  [/^is required for category '(.+)'$/, 'Wymagany dla kategorii „$1”.'],
+  [/^numeric value out of bounds.*$/, 'Za duża liczba lub za dużo miejsc po przecinku.'],
 ]
 
 export function translateFieldMessage(message: string): string {

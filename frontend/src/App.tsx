@@ -1,9 +1,10 @@
 import { Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
+import { AdminPage } from './pages/AdminPage'
 import { CatalogPage } from './pages/CatalogPage'
-import { ComingSoonPage } from './pages/ComingSoonPage'
 import { EquipmentDetailsPage } from './pages/EquipmentDetailsPage'
+import { EquipmentUnitsPage } from './pages/EquipmentUnitsPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { MyRentalsPage } from './pages/MyRentalsPage'
@@ -49,7 +50,15 @@ export default function App() {
           path="admin"
           element={
             <RequireAuth roles={['ADMIN']}>
-              <ComingSoonPage title="Administracja" />
+              <AdminPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="admin/equipment/:id"
+          element={
+            <RequireAuth roles={['ADMIN']}>
+              <EquipmentUnitsPage />
             </RequireAuth>
           }
         />
