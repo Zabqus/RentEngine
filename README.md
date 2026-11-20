@@ -17,6 +17,7 @@ Klient przegląda katalog i rezerwuje sprzęt na konkretny termin. Pracownik spi
 - [REST API](#rest-api)
 - [Testy i CI](#testy-i-ci)
 - [Struktura projektu](#struktura-projektu)
+- [Demo](#demo)
 
 ## Technologie
 
@@ -347,3 +348,7 @@ RentEngine/
 ```
 
 Każdy moduł backendu ma ten sam podział: `controller`, `service`, `repository`, `dto`, `entity`, `mapper`. Logika biznesowa jest w serwisach i w `PricingCalculator` (czysta klasa bez zależności od Springa), a kontrolery tylko mapują HTTP.
+
+## Demo
+
+Nagranie pokazujące działanie aplikacji jest w [`demo/rentengine-demo.mp4`](demo/rentengine-demo.mp4): katalog, rezerwacja i anulowanie, wydanie, przeterminowanie umowy, zwrot z uszkodzeniem, rozliczenie, e-maile w Mailpit i panel administratora.
